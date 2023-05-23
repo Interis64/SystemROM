@@ -151,7 +151,7 @@ StartupMessage:
     DB "           System ROM v0.7.0"
     DB ASCII.CR, ASCII.LF
     DB ASCII.CR, ASCII.LF
-    DB "(C) 2023 M. Martin  All Rights Reserved"
+    DB "    (C) 2023 M. Martin - GNU GPL 3.0"
     DB ASCII.CR, ASCII.LF
     DB ASCII.CR, ASCII.LF
     DB "      https://github.com/Interis64"
