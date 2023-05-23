@@ -1,0 +1,398 @@
+; ------------------------------------------------------------------------------
+; FloppyDisk.z80
+; ------------------------------------------------------------------------------
+; WD37C65C Floppy Disk Drive controller support.
+; ------------------------------------------------------------------------------
+; Interis 64 Z80 Computer
+; https://github.com/Interis64
+; 
+; Copyright 2023 Matthew Martin
+; Licensed under the GNU GPL 3.0. See the LICENSE file for details.
+; ------------------------------------------------------------------------------
+; Floppy Disk Format Specs
+; 3.5" Disks
+; Double-Sided, High Density, MFM encoding
+; 135 TPI, 80 tracks, 18 sectors per track
+; 300 RPM, 500 kbps
+; ------------------------------------------------------------------------------
+FloppyDisk:         PROC
+
+SLOT:               EQU SLOT5
+
+PORT_MSR:           EQU SLOT + $10
+PORT_TC:            EQU SLOT + $05
+PORT_LDCR:          EQU SLOT + $09              
+PORT_CS:            EQU SLOT + $11
+PORT_LDOR:          EQU SLOT + $19
+PORT_DISK_CHG:      EQU SLOT + $1C          ; Data bit 7 will contain the /DC signal
+
+BootCodeAddress:    EQU $9000               ; Address the boot sector should be loaded into
+
+; RAM Locations
+DataBuffer:         EQU $8500               ; Starting address for read/write sector data (pointer to 512 byte block)
+DriveNumber:        EQU DataBuffer   + 2    ; should be $00 or $01
+TrackNumber:        EQU DriveNumber  + 1
+HeadNumber:         EQU TrackNumber  + 1    ; should be $00 or $01
+SectorNumber:       EQU HeadNumber   + 1
+StatusBytes:        EQU SectorNumber + 1    ; Storage for result status bytes (4 bytes)
+
+; ------------------------------------------------------------------------------
+; N, SC, GPL Values
+; N = 2
+; SC = $09
+; GPL = $1B (read, write)
+; GPL = $54 (format)
+; ------------------------------------------------------------------------------
+; Control Register Configuration (Datasheet p31-10)
+; CR1 0
+; CR0 0
+; DRV x
+; RPM 1
+
+Initialize:
+    CALL    ResetFDC
+    CALL    SelectDrive0
+    CALL    Specify
+    CALL    Recalibrate
+    CALL    DeselectDrives
+    RET
+
+; -------------------------------------
+; Soft-Reset the Floppy Controller
+; and wait for drives to be polled and
+; ready
+; -------------------------------------
+ResetFDC:
+    LD      A, 00000000b                    ; Soft-reset the FDC
+    OUT     (PORT_LDOR), A
+
+    LD      A, 00001100b                    ; Puts the FDC into AT/EISA Mode
+    OUT     (PORT_LDOR), A
+
+    LD      A, $00                          ; Load the control register
+    OUT     (PORT_LDCR), A
+
+	LD	    DE, 144			                ; DELAY: 17.4µs * 144 = 2.5ms
+	CALL	Utils.Delay
+
+ResetWait:
+    ; Wait for drives to be ready
+    LD      A, 00001000b                    ; "Sense Interrupt" command
+    CALL    WriteDataRegister
+    CALL    ReadDataRegister
+    AND     11000000b
+    CP      11000000b
+    JP      NZ, ResetWaitDone                ; If we get something other than $CX, then we're done waiting for drives to be ready
+    CALL    ReadDataRegister
+    JP      ResetWait
+ResetWaitDone:
+    RET
+
+; -------------------------------------
+; Poll the Main Status Register
+; until the DIO bit is 1 (read) and
+; RQM bit is 1 (ready), then read
+; from the data register
+; -------------------------------------
+ReadDataRegister:
+    IN      A, (PORT_MSR)                   ; Read main status register
+    AND     11000000b
+    CP      11000000b
+    JP      NZ, ReadDataRegister
+    IN      A, (PORT_CS)
+    RET
+    
+; -------------------------------------
+; Poll the masMain Status Register
+; until the DIO bit is 0 (write) and
+; RQM bit is 1 (ready), then write
+; to the data register
+; -------------------------------------
+WriteDataRegister:
+    PUSH    AF
+WriteDataRegisterWaitLoop:
+    IN      A, (PORT_MSR)                   ; Read main status register
+    AND     11000000b
+    CP      10000000b
+    JP      NZ, WriteDataRegisterWaitLoop
+    POP     AF
+    OUT     (PORT_CS), A
+    RET
+
+; -------------------------------------
+; Select Drive 0
+; -------------------------------------
+SelectDrive0:
+    LD      A, 00010100b
+    OUT     (PORT_LDOR), A
+    RET
+
+; -------------------------------------
+; Select Drive 1
+; -------------------------------------
+SelectDrive1:
+    LD      A, 00100101b
+    OUT     (PORT_LDOR), A
+    RET
+
+; -------------------------------------
+; Deselect Drives
+; -------------------------------------
+DeselectDrives:
+    LD      A, 00001100b
+    OUT     (PORT_LDOR), A
+    RET
+
+; -------------------------------------
+; "Specify" Command
+; -------------------------------------
+; Command Bytes
+; 00000011 - Command instruction
+; SSSSUUUU - S = Step Time, U = Unload Time
+; HHHHHHHD - H = Head Load Time, D = Non-DMA mode
+; -------------------------------------
+Specify:
+    LD      A, 00000011b                    ; "Specify" Command
+    CALL    WriteDataRegister
+    LD      A, $D0                          ; Step Time (0xD0) and Unload Time (0x01)
+    CALL    WriteDataRegister
+    LD      A, $11                          ; Load Time (0x01) and non-DMA mode (0x01)
+    CALL    WriteDataRegister
+
+    RET
+
+; -------------------------------------
+; "Recalibrate" Command
+; -------------------------------------
+; Command Bytes
+; 00000111 - Command instruction
+; 000000DD - DD = Drive select
+; -------------------------------------
+Recalibrate:
+    LD      A, 00000111b                    ; "Recalibrate" command
+    CALL    WriteDataRegister
+    LD      A, 00000000b                    ; Drive 0
+    CALL    WriteDataRegister
+RecalibrateWait:
+    ; Wait for the "recalibrate" to finish
+    LD      A, 00001000b                    ; "Sense Interrupt" command
+    CALL    WriteDataRegister
+    CALL    ReadDataRegister
+    AND     00100000b                       ; Mask for the termination bit
+    CP      00100000b                       ; Normal Termination of Seek/Recal Command
+    JP      NZ, RecalibrateWait
+    CALL    ReadDataRegister
+
+    RET
+
+; -------------------------------------
+; "Seek" Command
+; -------------------------------------
+; Command Bytes
+; 00001111 - Command Instruction
+; 00000HDD - H = Head, D = Drive
+; CCCCCCCC - C = New Cylinder Number (NCN)
+; -------------------------------------
+Seek:
+    LD      A, 00001111b                    ; "Seek" command
+    CALL    WriteDataRegister
+    LD      A, 00000000b                    ; Drive 0, Head 0
+    CALL    WriteDataRegister
+    LD      A, (TrackNumber)
+    CALL    WriteDataRegister
+SeekWait:
+    ; Wait for the "seek" to finish
+    LD      A, 00001000b                    ; "Sense Interrupt" command
+    CALL    WriteDataRegister
+    CALL    ReadDataRegister
+    AND     00100000b                       ; Mask for the termination bit
+    CP      00100000b                       ; Normal Termination of Seek/Recal Command
+    JP      NZ, SeekWait
+    CALL    ReadDataRegister
+
+    RET
+
+
+; -------------------------------------
+; Read Data Command
+; -------------------------------------
+; Command Bytes
+; 01S00110 (S = skip deleted data address)
+; 00000H0D (H = Head number, D = drive number)
+; CCCCCCCC (cylinder number)
+; 0000000H (Head Address)
+; RRRRRRRR (Sector Number)
+; 00000010 (Number of data bytes = 2 (see N, above))
+; EEEEEEEE (End Of Track - Last sector number to read)
+; 00011011 (GPL Gap Length = $1B (see above))
+; 11111111 (DTL, Data Length, $FF if N is set above)
+; -------------------------------------
+ReadSector:
+    DI                                      ; Disable interrupts so we keep timing during this
+
+    PUSH    HL
+    PUSH    DE
+
+    ; Command
+    LD      A, 01000110b                    ; "Read Data" command
+    CALL    WriteDataRegister
+
+    ; Head and Drive ID
+    LD      A, (HeadNumber)
+    SLA     A
+    SLA     A
+    LD      HL, DriveNumber
+    OR      (HL)
+    CALL    WriteDataRegister
+    
+    ; Cylinder Number
+    LD      A, (TrackNumber)
+    CALL    WriteDataRegister
+    
+    ; Head Address
+    LD      A, (HeadNumber)
+    CALL    WriteDataRegister
+    
+    ; Sector Number
+    LD      A, (SectorNumber)
+    CALL    WriteDataRegister
+    
+    ; Bytes per sector
+    LD      A, 00000010b
+    CALL    WriteDataRegister
+
+    ; End of Track
+    LD      A, (SectorNumber)
+    CALL    WriteDataRegister
+
+    ; Gap Length
+    LD      A, $1B
+    CALL    WriteDataRegister
+
+    ; Data Length (unused)
+    LD      A, $FF
+    CALL    WriteDataRegister
+
+; **********************************
+; ADD CODE TO HANDLE NO SECTOR FOUND
+; **********************************
+
+
+    ; Execution Phase, transfer data into buffer
+    LD      HL, (DataBuffer)                ; Get the pointer to the data buffer
+    LD      DE, $0000                       ; Timeout value
+ReadSectorDataLoop:
+    IN      A, (PORT_MSR)
+    CP      $F0
+    JP      Z, ReadDataByte
+    CP      $D0
+    JP      Z, ReadSectorDataComplete       ; IF the execution bit is reset, then jump to reading results
+    ; CP      $C0                             ; Execution Aborted
+    ; JP      Z, ReadSectorAbort
+    DEC     DE                              ; Nothing happening? Decrement our timeout counter and try again
+    LD      A, D
+    OR      E                               ; Has our timeout counter timed out?
+    JP      Z, ReadSectorTimeout            ; If so, bail to the timeout routine
+    JP      ReadSectorDataLoop
+ReadDataByte:
+    IN      A, (PORT_CS)
+    LD      (HL), A
+    INC     HL
+    JR      ReadSectorDataLoop
+
+ReadSectorAbort:
+    POP     DE
+    POP     HL
+    EI
+    RET
+
+ReadSectorTimeout:
+    POP     DE
+    POP     HL
+    EI
+    RET
+
+ReadSectorDataComplete:   
+    ; Read Results Information
+    LD      HL, StatusBytes
+    CALL    ReadDataRegister ; Status 0
+    LD      (HL), A
+    INC     HL
+    CALL    ReadDataRegister ; Status 1
+    LD      (HL), A
+    INC     HL
+    CALL    ReadDataRegister ; Status 2
+    LD      (HL), A
+    INC     HL
+    CALL    ReadDataRegister ; Cyl
+    LD      (HL), A
+    INC     HL
+    CALL    ReadDataRegister ; Head
+    LD      (HL), A
+    INC     HL
+    CALL    ReadDataRegister ; Record (sector)
+    LD      (HL), A
+    INC     HL
+    CALL    ReadDataRegister ; Number of bytes
+    LD      (HL), A
+
+    POP     DE
+    POP     HL
+    EI                                      ; Re-enable interrupts now that we're done
+    RET
+
+; -------------------------------------
+; Floppy Boot Routine
+; -------------------------------------
+; Load the first sector from the first disk drive into RAM starting at BootCodeAddress
+; Then transfer execution to that code if it exists
+; -------------------------------------
+Boot:
+    ; Clear the read buffer
+    LD      B, 0
+    LD      HL, BootCodeAddress
+ClearLoop:
+    LD      (HL), $00
+    INC     HL
+    DJNZ    ClearLoop
+ClearLoop2:
+    LD      (HL), $00
+    INC     HL
+    DJNZ    ClearLoop2
+
+
+    LD      HL, DriveNumber
+    LD      (HL), $00
+    LD      HL, TrackNumber
+    LD      (HL), $00
+    LD      HL, HeadNumber
+    LD      (HL), $00
+    LD      HL, SectorNumber
+    LD      (HL), $01
+
+    ; Point the data buffer to our bootstrap location
+    LD      HL, BootCodeAddress
+    LD      (DataBuffer), HL
+
+    CALL    SelectDrive0
+    CALL    Seek
+    CALL    ReadSector
+    CALL    DeselectDrives
+
+    ; ************************************************************
+    ; Verify the "magic word" that says this is an Interis64 disk
+    ; It should be $BB66 as the last two bytes of the first sector
+    ; This is a cheeky homage to IBM's $AA55
+    ; ************************************************************
+    LD      A, (BootCodeAddress + $01FE)
+    CP      $BB
+    RET     NZ
+    LD      A, (BootCodeAddress + $01FF)
+    CP      $66
+    RET     NZ
+    
+    JP      BootCodeAddress     ; Otherwise, we got a good read, so jump to the boot sector code in RAM
+
+; ------------------------------------------------------------------------------
+	ENDP
+; ------------------------------------------------------------------------------

@@ -1,0 +1,488 @@
+; ------------------------------------------------------------------------------
+; TMS9918A.z80
+; ------------------------------------------------------------------------------
+; TMS9918A video card support
+; ------------------------------------------------------------------------------
+; Interis 64 Z80 Computer
+; https://github.com/Interis64
+; 
+; Copyright 2023 Matthew Martin
+; Licensed under the GNU GPL 3.0. See the LICENSE file for details.
+; ------------------------------------------------------------------------------
+TMS9918A: PROC
+; ------------------------------------------------------------------------------
+	INCLUDE "TMSFont.z80"
+
+TextScreenEnd:      EQU $17C0               ; VRAM Address one past the last char of the screen
+
+    SECTION SYSRAM
+
+Installed:          DS VIRTUAL 1            ; Set this to non-zero if the card is intalled and detected
+ControlPort:        DS VIRTUAL 1
+DataPort:           DS VIRTUAL 1
+CursorPosition:     DS VIRTUAL 2            ; The VRAM address of the text cursor
+LinePosition:       DS VIRTUAL 1            ; The cursor position relative to the start of the line
+LineCopyBuffer:     DS VIRTUAL 240          ; Space to copy six lines worth of text (for scrolling)
+
+    ENDS
+
+Initialize:
+    ; Clear the installed flag (this will be set based on tests later in the init routine)
+    LD      A, $00
+    LD      (Installed), A
+
+    ; Set up control port location from NVRAM config
+    ; Set up data port location from NVRAM config
+    ; LD      A, NVRAM.TMS9918A_SLOT
+    ; CALL    NVRAM.GetIOPort
+    CALL    LookForCard
+    LD      A, (Installed)
+    CP      $00                             ; Check if the card is not installed
+    RET     Z                               ; Bail out if card is not installed
+
+    DEC     A                               ; Get back to base address
+    SLA     A                               ; A << 4 to get IRQ number
+    SLA     A
+    SLA     A
+    SLA     A
+    LD      H, $80                          ; Point HL at the interrupt table
+    LD      L, A                            ; location for this IRQ number
+    LD      (HL), IRQHandler                ; Plop our IRQ routine pointer there
+
+	LD      B, $00                          ; Register 0
+	LD      A, 00000000b                    ; Disable Mode3, Disable External VDP
+	CALL    WriteRegister
+	
+	INC     B                               ; Register 1
+	LD      A, 11010000b                    ; 4116 RAM, No Blanking, Text Mode
+	CALL    WriteRegister
+
+	INC     B                               ; Register 2
+	LD      A, $05                          ; Pattern Name Table Base Address 0x1400
+	CALL    WriteRegister
+
+	INC     B                               ; Register 3
+	LD      A, $80                          ; Color Table Base Address 0x2000
+	CALL    WriteRegister
+
+	INC     B                               ; Register 4
+	LD      A, $01                          ; Pattern Generator Base Address 0x0800
+	CALL    WriteRegister
+
+	INC     B                               ; Register 5
+	LD      A, $20                          ; Sprite Attribute Table Base Address 0x1000
+	CALL    WriteRegister
+
+	INC     B                               ; Register 6
+	LD      A, $00                          ; Sprite Pattern Generator Base Address 0x0000
+	CALL    WriteRegister
+
+; TODO: Load color config from NVRAM
+
+	INC     B                               ; Register 7
+	LD      A, $1F                          ; Text Color 1 / Text Color 0/Backdrop
+	CALL    WriteRegister
+
+
+    LD      A, (ControlPort)
+    LD      C, A
+	LD      A, $00                          ; Set low byte of VRAM address 0x00
+	OUT     (C), A
+	LD      A, $48                          ; Set high byte of VRAM address 0x08
+	OUT     (C), A
+	
+	LD      HL, TMSFont                     ; Load address of font
+	LD      B, $00
+    LD      A, (DataPort)
+	LD      C, A                            ; Write character glyphs to pattern table
+	OTIR
+	OTIR
+	OTIR
+	OTIR
+	OTIR
+	OTIR
+	OTIR
+	OTIR
+
+ClearVRAM:
+    PUSH    AF
+    PUSH    BC
+    PUSH    HL
+    LD      HL, $1400                       ; Set the cursor to the beginning of the
+    LD      (CursorPosition), HL            ; Pattern Name Table
+    LD      A, $00                          ; Clear the LinePosition indicator
+    LD      (LinePosition), A
+
+    LD      A, (ControlPort)
+    LD      C, A
+    LD      A, $00                          ; Set low byte of VRAM address 0x00
+    OUT     (C), A
+    LD      A, $54                          ; Set high byte of VRAM address 0x14
+    OUT     (C), A
+    LD      A, (DataPort)
+    LD      C, A
+    XOR     A
+    LD      B, $04
+ClearVRAMLoop:
+    PUSH    BC
+    LD      B, $00
+ClearVRAMLoopInner:
+    OUT     (C), A
+    DJNZ    ClearVRAMLoopInner
+    POP     BC
+    DJNZ    ClearVRAMLoop
+
+    LD      HL, $1400                       ; Set the cursor to the beginning of the
+    LD      (CursorPosition), HL            ; Pattern Name Table
+    XOR     A                               ; Clear the LinePosition indicator
+    LD      (LinePosition), A
+    LD      A, (ControlPort)
+    LD      C, A
+    XOR     A                               ; Set low byte of VRAM address 0x00
+    OUT     (C), A
+    LD      A, $54                          ; Set high byte of VRAM address 0x14
+    OUT     (C), A
+        
+    POP     HL
+    POP     BC
+    POP     AF
+    RET
+
+IRQHandler:
+    EI
+	RETI
+
+LookForCard:
+    LD      A, $80                          ; Start looking at base address 0x80
+LookForCardLoop:
+    LD      (DataPort), A                   ; Store base address as data port
+    INC     A
+    LD      (ControlPort), A                ; Store base address + 1 as control port
+
+    PUSH    AF
+    CALL    CheckCardExists                 ; Writes and reads back some VRAM to validate the card
+    JP      Z, FoundCard
+    POP     AF
+
+    CP      $E1
+    RET     NC
+    ADD     A, $1F
+    JP      LookForCardLoop
+
+FoundCard:
+    LD      A, $01
+    LD      (Installed), A
+    POP     AF
+    RET
+
+
+CheckCardExists:
+    LD      DE, $1400
+    LD      A, $00
+    CALL    WriteVRAM
+    CALL    ReadVRAM
+    CP      $00
+    RET     NZ                              ; Values don't match, so bail
+
+    LD      DE, $1400
+    LD      A, $55
+    CALL    WriteVRAM
+    CALL    ReadVRAM
+    CP      $55
+    RET     NZ                              ; Values don't match, so bail
+
+    LD      DE, $1400
+    LD      A, $AA
+    CALL    WriteVRAM
+    CALL    ReadVRAM
+    CP      $AA
+    RET     NZ                              ; Values don't match, so bail
+
+    LD      DE, $1400
+    LD      A, $FF
+    CALL    WriteVRAM
+    CALL    ReadVRAM
+    CP      $FF
+    RET
+
+; Writes A to the VRAM location DE
+WriteVRAM:
+    PUSH    BC
+    PUSH    AF
+    LD      A, (ControlPort)
+    LD      C, A
+	LD      A, E
+	OUT     (C), A
+	LD      A, D
+	AND     00111111b
+	OR      01000000b
+	OUT     (C), A
+    LD      A, (DataPort)
+    LD      C, A
+	POP     AF
+	OUT     (C), A
+    POP     BC
+    RET
+
+; Writes data from memory addresses HL to HL + B starting at VRAM address DE
+WriteVRAMBlock:
+    PUSH    AF
+    PUSH    BC
+    LD      A, (ControlPort)
+    LD      C, A
+	LD      A, E
+	OUT     (C), A
+	LD      A, D
+	AND     00111111b
+	OR      01000000b
+	OUT     (C), A
+	LD      A, (DataPort)
+    LD      C, A
+	OTIR
+    POP     BC
+    POP     AF
+    RET
+
+; Reads the VDP status register into A
+ReadStatus:
+    LD      A, (ControlPort)
+    LD      C, A
+    IN      A, (C)
+    RET
+
+; Reads A from the VRAM location DE
+ReadVRAM:
+    PUSH    BC
+    LD      A, (ControlPort)
+    LD      C, A
+	LD      A, E
+	OUT     (C), A
+	LD      A, D
+	AND     00111111b
+	OUT     (C), A
+    LD      A, (DataPort)
+    LD      C, A
+	IN      A, (C)
+    POP     BC
+    RET
+
+
+; Reads data into memory addresses HL to HL + B starting at VRAM address DE
+ReadVRAMBlock:
+    PUSH    AF
+    PUSH    BC
+    LD      A, (ControlPort)
+    LD      C, A
+    LD      A, E
+    OUT     (C), A
+    LD      A, D
+    AND     00111111b
+    OUT     (C), A
+    LD      A, (DataPort)
+    LD      C, A
+    INIR
+    POP     BC
+    POP     AF
+    RET
+    
+
+; Writes the data in A to VDP register number B
+WriteRegister:
+    PUSH    AF
+    LD      A, (ControlPort)
+    LD      C, A
+    POP     AF
+    OUT     (C), A
+    LD      A, B
+    AND     00000111b
+    OR      10000000b
+    OUT     (C), A
+    RET
+
+; Prints the byte in A as an ASCII character at the cursor position
+PrintChar:
+    CP      ASCII.FF                        ; Handle Form Feed (clear screen)
+    JP      Z, ClearVRAM
+    CP      ASCII.CR                        ; Handle carriage return
+    JP      Z, LineFeed
+    CP      ASCII.LF                        ; Handle line feed
+    RET     Z
+    ; JP      Z, PrintLF
+    CP      ASCII.BACKSPACE
+    JP      Z, Backspace
+    PUSH    BC
+    PUSH    DE
+    LD      DE, (CursorPosition)
+    PUSH    AF
+    CALL    WriteVRAM
+    LD      A, (DataPort)
+    LD      C, A
+    LD      A, $FF
+    OUT     (C), A
+    INC     DE
+    LD      (CursorPosition), DE
+    CALL    IncrementLinePosition
+    POP     AF
+    POP     DE
+    POP     BC
+    RET
+
+LineFeed:
+    PUSH    AF
+    PUSH    BC
+LineFeedLoop:
+    LD      A, " "
+    CALL    PrintChar
+    LD      A, (LinePosition)
+    CP      0
+    JR      NZ, LineFeedLoop
+    POP     BC
+    POP     AF
+    RET
+
+
+PrintCR:
+    PUSH    AF
+    PUSH    BC
+    LD      A, (LinePosition)
+    LD      B, A
+PrintCRLoop:
+    LD      HL, LinePosition
+    DEC     (HL)
+    LD      HL, CursorPosition
+    DEC     (HL)
+    DJNZ    PrintCRLoop
+    POP     BC
+    POP     AF
+    RET
+
+PrintLF:
+    PUSH    DE
+    PUSH    HL
+
+    LD      DE, (CursorPosition)            ; Get the current cursor position
+    LD      A, " "                          ; Clear the cursor
+    CALL    WriteVRAM
+    
+    LD      HL, (CursorPosition)
+    LD      DE, 40
+    ADD     HL, DE
+    LD      (CursorPosition), HL
+    POP     HL
+    POP     DE
+    RET
+
+Backspace:
+    PUSH    AF
+    PUSH    DE
+    PUSH    HL
+
+    LD      DE, (CursorPosition)            ; Get the current cursor position
+    LD      A, " "                          ; Clear the cursor
+    CALL    WriteVRAM
+    DEC     DE                              ; Go back a char
+    LD      A, $FF                          ; Overwrite with the cursor
+    CALL    WriteVRAM
+    LD      (CursorPosition), DE
+    CALL    DecrementLinePosition
+
+    POP     HL
+    POP     DE
+    POP     AF
+    RET
+
+IncrementLinePosition:
+    PUSH    AF
+    LD      A, (LinePosition)
+    INC     A
+    CP      40
+    JR      NC, ResetLinePosition
+    LD      (LinePosition), A
+    POP     AF
+    RET
+ResetLinePosition:
+    XOR     A
+    LD      (LinePosition), A
+    CALL    CheckScreenScroll
+    POP     AF
+    RET
+
+DecrementLinePosition:
+    PUSH    AF
+    LD      A, (LinePosition)
+    CP      0
+    JR      Z, DecrementLinePositionReset
+    DEC     A
+    LD      (LinePosition), A
+    POP     AF
+    RET
+DecrementLinePositionReset:
+    LD      A, 40
+    LD      (LinePosition), A
+    POP     AF
+    RET
+
+CheckScreenScroll:
+    PUSH    DE
+    PUSH    HL
+    
+    LD      HL, (CursorPosition)
+    LD      DE, TextScreenEnd
+    OR      A                               ; CP HL, DE
+    SBC     HL, DE                          ; CP HL, DE
+    ADD     HL, DE                          ; CP HL, DE
+    POP     HL
+    POP     DE
+    RET     C                               ; Not at the end of the screen, nothing to do
+
+    PUSH    AF
+    PUSH    DE
+    PUSH    HL
+
+    LD      HL, LineCopyBuffer          
+    LD      DE, $1428                       ; Start at the second line
+    LD      B, 240
+    CALL    ReadVRAMBlock                   ; read 6 lines
+    LD      HL, LineCopyBuffer
+    LD      DE, $1400                       ; Go back to the first line
+    LD      B, 240
+    CALL    WriteVRAMBlock                  ; write 6 lines
+    
+    LD      HL, LineCopyBuffer          
+    LD      DE, $1518                   
+    LD      B, 240
+    CALL    ReadVRAMBlock
+    LD      HL, LineCopyBuffer
+    LD      DE, $14F0
+    LD      B, 240
+    CALL    WriteVRAMBlock
+    
+    LD      HL, LineCopyBuffer          
+    LD      DE, $1608                   
+    LD      B, 240
+    CALL    ReadVRAMBlock
+    LD      HL, LineCopyBuffer
+    LD      DE, $15E0
+    LD      B, 240
+    CALL    WriteVRAMBlock
+    
+    LD      HL, LineCopyBuffer          
+    LD      DE, $16F8                   
+    LD      B, 240
+    CALL    ReadVRAMBlock
+    LD      HL, LineCopyBuffer
+    LD      DE, $16D0
+    LD      B, 240
+    CALL    WriteVRAMBlock
+
+    LD      HL, $1798
+    LD      (CursorPosition), HL
+    
+    POP     HL
+    POP     DE
+    POP     AF
+    RET
+
+; ------------------------------------------------------------------------------
+	ENDP
+; ------------------------------------------------------------------------------

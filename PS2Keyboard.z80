@@ -1,0 +1,182 @@
+; ------------------------------------------------------------------------------
+; PS2Keyboard.z80
+; ------------------------------------------------------------------------------
+; PS/2 Keyboard Driver
+; ------------------------------------------------------------------------------
+; Interis 64 Z80 Computer
+; https://github.com/Interis64
+; 
+; Copyright 2023 Matthew Martin
+; Licensed under the GNU GPL 3.0. See the LICENSE file for details.
+; ------------------------------------------------------------------------------
+PS2Keyboard:    PROC
+; ------------------------------------------------------------------------------
+
+Port:           EQU SLOT1                   ; Port number for the PS2 device
+
+ScanCode:       EQU $8150
+Flags:          EQU ScanCode + 1 
+RelNotifier:    EQU Flags + 1
+
+Flag_Shift:     EQU 0
+Flag_Ctrl:      EQU 1
+Flag_Alt:       EQU 2
+Flag_Extend:    EQU 3
+Flag_Release:   EQU 4
+Flag_Released:  EQU 5               ; This is for code that wants to know when a key has been released (bit of a hack, admittedly)    
+
+Initialize:
+    XOR     A
+    LD      (ScanCode), A
+    LD      (Flags), A
+    RET
+
+WaitForKeyRelease:
+    LD      A, (Flags)
+    BIT     Flag_Released, A
+    JP      Z, WaitForKeyRelease
+    RES     Flag_Released, A
+    LD      (Flags), A
+    RET
+
+IRQHandler:
+    PUSH    AF
+    PUSH    BC
+    PUSH    HL
+
+    IN      A, (Port)
+
+    CP      $F0                             ; Check for "break" code (key released)
+    JP      Z, KeyReleased
+
+    CP      $12                             ; Test left shift
+    JP      Z, ProcShiftKey
+    CP      $59                             ; Test right shift
+    JP      Z, ProcShiftKey
+
+    CP      $14                             ; Test left control
+    JP      Z, ProcCtrlKey
+
+    CP      $11                             ; Test left alt
+    JP      Z, ProcAltKey
+
+    CP      $84                             ; See if we're past the end of the scan code table
+    JP      NC, IRQExit
+
+    CP      $76                             ; If we hit escape,
+    CALL    Z, TestSoftReset                ; check the soft reset chord
+
+    LD      (ScanCode), A
+
+    LD      A, (Flags)
+    BIT     4, A
+    JP      Z, AcceptKey
+    RES     Flag_Release, A                 ; Reset the KeyRelease flag
+    SET     Flag_Released, A                 ; Reset the KeyReleased flag
+    LD      (Flags), A
+    JP      IRQExit
+
+AcceptKey:
+    BIT     Flag_Shift, A                   ; Test whether we're in a shift state
+    JP      NZ, LoadShiftedTable
+    LD      HL, ScanCodeTable.Lowercase
+    JP      TranslateScanCode
+LoadShiftedTable:
+    LD      HL, ScanCodeTable.Uppercase
+TranslateScanCode:
+    LD      A, (ScanCode)
+    LD      BC, $0000
+    LD      C, A
+
+    ADD     HL, BC
+    LD      A, (HL)
+    CP      0
+
+    PUSH    AF
+    LD      A, (Flags)
+    BIT     Flag_Ctrl, A
+    JP      Z, SkipCtrl
+    POP     AF
+    RES     6, A
+    RES     5, A
+    PUSH    AF
+SkipCtrl:
+    POP     AF
+    CALL    NZ, BufferedInput.Accept        ; Accept it if we have a nonzero character
+    ; Continue through to IRQExit
+    CP      ASCII.CR
+    JR      NZ, IRQExit
+    LD      A, ASCII.LF
+    CALL    BufferedInput.Accept
+
+IRQExit:
+    XOR     A
+    LD      (ScanCode), A
+    POP     HL
+    POP     BC
+    POP     AF
+    EI
+    RETI
+
+TestSoftReset:
+    PUSH    AF
+    LD      A, (Flags)
+    BIT     Flag_Shift, A
+    JP      Z, SkipSoftReset
+    BIT     Flag_Ctrl, A
+    JP      Z, SkipSoftReset
+    RST     $00
+SkipSoftReset:
+    POP     AF
+    RET
+
+KeyReleased:
+    LD      A, (Flags)
+    SET     Flag_Release, A                 ; Set the KeyRelease flag
+    LD      (Flags), A
+    JP      IRQExit
+
+ProcShiftKey:
+    LD      A, (Flags)
+    BIT     Flag_Release, A
+    JP      NZ, ProcShiftRelease
+    SET     Flag_Shift, A                   ; Set the Shift flag
+    LD      (Flags), A
+    JP      IRQExit
+ProcShiftRelease:
+    RES     Flag_Shift, A                   ; Clear the KeyRelease and Shift flags
+    RES     Flag_Release, A
+    LD      (Flags), A
+    JP      IRQExit
+
+ProcCtrlKey:
+    LD      A, (Flags)
+    BIT     Flag_Release, A
+    JP      NZ, ProcCtrlRelease
+    SET     Flag_Ctrl, A
+    LD      (Flags), A
+    JP      IRQExit
+ProcCtrlRelease:
+    RES     Flag_Ctrl, A                    ; Clear the KeyRelease and Ctrl flags
+    RES     Flag_Release, A
+    LD      (Flags), A
+    JP      IRQExit
+
+ProcAltKey:
+    LD      A, (Flags)
+    BIT     Flag_Release, A
+    JP      NZ, ProcAltRelease
+    SET     Flag_Alt, A                     ; Set the Alt flag
+    LD      (Flags), A
+    JP      IRQExit
+ProcAltRelease:
+    RES     Flag_Alt, A                     ; Clear the KeyRelease and Ctrl flags
+    RES     Flag_Release, A
+    LD      (Flags), A
+    JP      IRQExit
+
+    INCLUDE "PS2ScanCodeTable.z80"
+
+; ------------------------------------------------------------------------------
+    ENDP
+; ------------------------------------------------------------------------------

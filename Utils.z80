@@ -1,0 +1,68 @@
+; ------------------------------------------------------------------------------
+; Utils.z80
+; ------------------------------------------------------------------------------
+; General-purpose utility functions
+; ------------------------------------------------------------------------------
+; Interis 64 Z80 Computer
+; https://github.com/Interis64
+; 
+; Copyright 2023 Matthew Martin
+; Licensed under the GNU GPL 3.0. See the LICENSE file for details.
+; ------------------------------------------------------------------------------
+Utils: PROC
+; ------------------------------------------------------------------------------
+
+; Reset harware installed flags so things go to serial I/O prior to hardware init
+Initialize:
+    XOR     A
+    LD      (TMS9918A.Installed), A
+    LD      (OPL2.Installed), A
+    RET
+
+PrintChar:
+    CP      ASCII.BELL
+    JP      Z, Beep
+    PUSH    AF
+    LD      A, (TMS9918A.Installed)         ; Check if we have the TMS9918A installed
+    CP      0
+    JP      NZ, VDPPrint                    ; If so, print the output there
+    POP     AF
+    JP      Serial.TXA                      ; Otherwise, write it to serial
+VDPPrint:
+    POP     AF
+    JP      TMS9918A.PrintChar
+
+
+PrintString:
+    LD      A, (HL)                         ; Get character
+    OR      A                               ; Is it $00 ?
+    RET     Z                               ; If so, then we're at the end and can return
+    CALL    PrintChar                         ; Print it
+    INC     HL                              ; Next Character
+    JR      PrintString                     ; Continue until $00
+
+PrintCRLF:
+    LD      A, ASCII.CR
+    JP      PrintChar
+
+Beep:
+    LD      A, (OPL2.Installed)             ; Check if we have an OPL2 installed
+    CP      0
+    JP      NZ, OPL2.Beep                   ; If so, send the beep there
+    JP      NVRAM.Beep                      ; Otherwise, use the NVRAM buzzer
+
+; Busy-wait for (DE * 17.4)µs
+Delay:
+    LD      A, 7                            ;  7 T
+DelayLoop:
+    DEC     A                               ;  4 T
+    JP      NZ, DelayLoop                   ; 10 T
+    DEC     DE                              ;  6 T
+    LD      A, D                            ;  4 T
+    OR      E                               ;  4 T
+    JP      NZ, Delay                       ; 10 T
+    RET
+
+; ------------------------------------------------------------------------------
+    ENDP
+; ------------------------------------------------------------------------------

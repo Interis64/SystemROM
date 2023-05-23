@@ -1,0 +1,184 @@
+; ------------------------------------------------------------------------------
+; Setup.z80
+; ------------------------------------------------------------------------------
+; System NVRAM Setup Utility.
+; ------------------------------------------------------------------------------
+; Interis 64 Z80 Computer
+; https://github.com/Interis64
+; 
+; Copyright 2023 Matthew Martin
+; Licensed under the GNU GPL 3.0. See the LICENSE file for details.
+; ------------------------------------------------------------------------------
+Setup: PROC
+; ------------------------------------------------------------------------------
+
+StringBuffer: EQU $8430                     ; 16 bytes
+StringBufferLength: EQU $8440
+
+Start:
+    RET
+    CALL  	NVRAM.ValidateChecksum
+    JP    	NZ, ChecksumFail
+    ; Print prompt on screen
+    LD    	HL, Strings.Prompt
+    CALL  	Utils.PrintString
+    CALL  	BufferedInput.Read
+    CP    	$1B                             ; Test for ESC character
+    JP    	Z, EnterSetup
+    LD		A, ASCII.FF
+    RST		$08
+    RET
+    
+ChecksumFail:
+    LD    	HL, Strings.InvalidChecksum
+    CALL  	Utils.PrintString
+    CALL  	BufferedInput.Read
+    CP      ASCII.CR
+    
+EnterSetup:
+    ; CALL  SetSystemTime
+    RST     $00                             ; Reset the machine to pick up changed hardware
+
+SetSystemTime:
+    PUSH    HL
+    LD      HL, Strings.SysDateLabel
+    CALL    Utils.PrintString
+
+    CALL    BuildDateString
+    LD      HL, StringBuffer
+    CALL    Utils.PrintString
+    LD      A, ASCII.CR
+    RST     $08
+
+    CALL    InputDateString
+
+    POP     HL
+    RET
+
+BuildDateString:
+    RET
+
+InputDateString:
+    LD      HL, StringBuffer
+    XOR     A
+    LD      (StringBufferLength), A
+InputDateStringLoop:
+    CALL    InDigit
+    LD      (HL), A
+    CP      $00
+    RET     Z
+    INC     HL
+    LD      A, (StringBufferLength)
+    INC     A
+    LD      (StringBufferLength), A
+    JR      InputDateStringLoop
+
+; Waits for the user to type a digit, echos it, returns the ASCII in A
+; If it's a LF, ignore. If it's a CR, return a null byte in A
+InDigit:    
+    CALL    BufferedInput.Read
+    CP      ASCII.LF                        ; Ignore LF
+    JP      Z, InDigit
+    CP      ASCII.CR                        ; CR
+    JP      Z, InDigitCR
+    CP      '0'
+    JP      C, InDigit
+    CP      '9'+1
+    JP      NC, InDigit
+    RST     $08
+    RET
+
+InDigitCR:
+    LD      A, $00
+    RET
+
+SetupHardware:
+    LD      HL, Strings.HardwarePromptTMS
+    LD      B, NVRAM.TMS9918A_SLOT
+    CALL    SetupSlot
+
+    LD      HL, Strings.HardwarePromptOPL
+    LD      B, NVRAM.OPL2_SLOT
+    CALL    SetupSlot
+
+    LD      HL, Strings.HardwarePromptFDC
+    LD      B, NVRAM.DISK_SLOT
+    CALL    SetupSlot
+
+    CALL    NVRAM.UpdateChecksum
+
+    RET
+
+SetupSlot:
+    CALL    Utils.PrintString
+    CALL    InputSlotNumber
+    CALL    NVRAM.WriteRaw
+    JP      Utils.PrintCRLF
+
+; Waits for the user to type a slot number, echos it, returns the slot number in A
+; If it's a CR, ignore. If it's a LF, return $FF in A
+InputSlotNumber:    
+    CALL    BufferedInput.Read
+    CP      ASCII.CR
+    JP      Z, InputSlotNumberCR
+    CP      ASCII.LF                        ; Ignore LF
+    JP      Z, InputSlotNumber
+    CP      '4'
+    JP      C, InputSlotNumber
+    CP      '7'+1
+    JP      NC, InputSlotNumber
+    RST     $08
+    RET
+InputSlotNumberCR:
+    LD      HL, Strings.NotInstalled
+    CALL    Utils.PrintString
+    LD      A, $FF
+    RET
+
+; ------------------------------------------------------------------------------
+
+HARDWARE_MENU_TABLE:
+    DW Strings.HardwarePromptTMS
+    DW Strings.HardwarePromptOPL
+    DW Strings.HardwarePromptFDC
+
+
+; ------------------------------------------------------------------------------
+
+Strings: PROC
+
+Prompt:
+    DB "Press ESC for system setup.", ASCII.CR
+    DB "Any other key to continue.", ASCII.CR, $00
+InvalidChecksum:
+    DB "NVRAM Checksum Invalid. Press a key to enter system setup", ASCII.CR, $00
+    
+TitleBar:
+    DB ASCII.FF, "Interis 64 System Setup", ASCII.CR, ASCII.CR, $00
+
+SysDateLabel:
+    DB "Current System Date: ", $00
+NewDatePrompt:
+    DB "New Date (YYYYMMDD):", ASCII.CR, $00
+
+SysTimeLabel:
+    DB "Current System Time: ", $00
+NewTimePrompt:
+    DB "New Time (HHMMSS):", ASCII.CR, $00
+
+HardwarePromptTMS:
+    DB "TMS9918A Graphics Slot: ", $00
+HardwarePromptOPL:
+    DB "       OPL2 Sound Slot: ", $00
+HardwarePromptFDC:
+    DB "      Floppy Disk Slot: ", $00
+
+NotInstalled:
+    DB  "Not Installed", $00
+
+    ENDP
+
+
+; ------------------------------------------------------------------------------
+    ENDP
+; ------------------------------------------------------------------------------
