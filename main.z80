@@ -154,7 +154,7 @@ StartupMessage:
     DB "(C) 2023 M. Martin  All Rights Reserved"
     DB ASCII.CR, ASCII.LF
     DB ASCII.CR, ASCII.LF
-    DB "   https://github.com/cajunc2/Interis"
+    DB "      https://github.com/Interis64"
     DB ASCII.CR, ASCII.LF
     DB ASCII.CR, ASCII.LF
     DB $00
