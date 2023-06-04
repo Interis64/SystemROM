@@ -22,14 +22,17 @@ ControlPort:        DS VIRTUAL 1
 DataPort:           DS VIRTUAL 1
 CursorPosition:     DS VIRTUAL 2            ; The VRAM address of the text cursor
 LinePosition:       DS VIRTUAL 1            ; The cursor position relative to the start of the line
+CursorChar:         DS VIRTUAL 1
 LineCopyBuffer:     DS VIRTUAL 240          ; Space to copy six lines worth of text (for scrolling)
-
     ENDS
 
 Initialize:
     ; Clear the installed flag (this will be set based on tests later in the init routine)
     LD      A, $00
     LD      (Installed), A
+
+    LD      A, $FF
+    LD      (CursorChar), A
 
     ; Set up control port location from NVRAM config
     ; Set up data port location from NVRAM config
@@ -317,7 +320,7 @@ PrintChar:
     CALL    WriteVRAM
     LD      A, (DataPort)
     LD      C, A
-    LD      A, $FF
+    LD      A, (CursorChar)
     OUT     (C), A
     INC     DE
     LD      (CursorPosition), DE
@@ -381,7 +384,7 @@ Backspace:
     LD      A, " "                          ; Clear the cursor
     CALL    WriteVRAM
     DEC     DE                              ; Go back a char
-    LD      A, $FF                          ; Overwrite with the cursor
+    LD      A, (CursorChar)                 ; Overwrite with the cursor
     CALL    WriteVRAM
     LD      (CursorPosition), DE
     CALL    DecrementLinePosition
