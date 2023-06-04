@@ -125,7 +125,7 @@ TestSoftReset:
     JP      Z, SkipSoftReset
     BIT     Flag_Ctrl, A
     JP      Z, SkipSoftReset
-    RST     $00
+    RST     $20
 SkipSoftReset:
     POP     AF
     RET
