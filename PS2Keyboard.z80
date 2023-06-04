@@ -64,7 +64,7 @@ IRQHandler:
     JP      NC, IRQExit
 
     CP      $76                             ; If we hit escape,
-    CALL    Z, TestSoftReset                ; check the soft reset chord
+    CALL    Z, TestGoSetup                ; check the soft reset chord
 
     LD      (ScanCode), A
 
@@ -118,15 +118,15 @@ IRQExit:
     EI
     RETI
 
-TestSoftReset:
+TestGoSetup:
     PUSH    AF
     LD      A, (Flags)
     BIT     Flag_Shift, A
-    JP      Z, SkipSoftReset
+    JP      Z, SkipGoSetup
     BIT     Flag_Ctrl, A
-    JP      Z, SkipSoftReset
+    JP      Z, SkipGoSetup
     RST     $20
-SkipSoftReset:
+SkipGoSetup:
     POP     AF
     RET
 
