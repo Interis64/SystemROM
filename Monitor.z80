@@ -191,7 +191,7 @@ ME_AcceptInputLoop:
     JP      Z, ME_AcceptInputLoop           ; If we're at max size, do nothing
     LD      A, B
     CALL    Utils.PrintChar                 ; Echo back to the screen
-    LD      (HL), A                         ; Stuff in the command buffer
+    LD      (HL), A                         ; Stuff into the command buffer
     INC     HL                              ; Move to the next location
     LD      A, (DataBufferLength)           ; Increment our length counter
     INC     A
@@ -209,7 +209,9 @@ ME_AcceptEscape:
 ME_AcceptBackspace:
     LD      A, (DataBufferLength)           ; Load our length counter
     CP      $00                             ; If we're at zero length, can't backspace
-    JP      ME_AcceptInputLoop              ; So just go back to our input loop
+    JP      Z, ME_AcceptInputLoop              ; So just go back to our input loop
+    LD      A, ASCII.BACKSPACE              ;
+    RST     $08                             ; Output the backspace char
     DEC     HL                              ; Go back a spot
     LD      A, (DataBufferLength)           ; Decrement our length counter
     DEC     A
