@@ -12,11 +12,11 @@
 NVRAM: PROC
 ; ------------------------------------------------------------------------------
 
-SLOT:           EQU SLOT3			; NVRAM is on-board at SLOT 3
+SLOT:           EQU SLOT3			        ; NVRAM is on-board at SLOT 3
 PORT_ADDR:      EQU SLOT
 PORT_DATA:      EQU SLOT + $01
 
-INT_VECTOR:     EQU $8150           ; Programmable interrupt routine
+INT_VECTOR:     EQU $8150                   ; Programmable interrupt routine
 
 ; ------------------------------
 ; Memory Locations
@@ -44,41 +44,10 @@ TMS9918A_SLOT:  EQU $14
 OPL2_SLOT:      EQU $15
 DISK_SLOT:      EQU $16
 
-;---------------------------------
-EXPANSION:      PROC
-; Hardware selection values
-; Graphics
-GLCD:           EQU $00
-TMS9918A:       EQU $01
-MC6847P:        EQU $02
-; Sound
-OPL2:           EQU $10
-SN76489:        EQU $11
-MIDIUART:       EQU $12
-; Input
-PCJOY:          EQU $20
-NES:            EQU $21
-MOUSE:          EQU $22
-; Storage
-FLOPPY:         EQU $30
-SDCARD:         EQU $31
-DISKONCHIP:     EQU $32
-; Communication
-PARALLEL:       EQU $40
-SERIAL:         EQU $41
-; Misc
-FPU:            EQU $50
-MEMORY:         EQU $51
-; Other
-NONE:           EQU $FF
-
-                ENDP
-;---------------------------------
-
 Defaults: PROC
 
-REG_A: EQU 00100111b            ; Enable oscillator, set square wave freq 1024Hz
-REG_B: EQU 00000111b            ; No interrupts, No square wave, binary datetime, 24-hour, DST on
+REG_A: EQU 00100111b                        ; Enable oscillator, set square wave freq 1024Hz
+REG_B: EQU 00000111b                        ; No interrupts, No square wave, binary datetime, 24-hour, DST on
 
     ENDP
 ; ------------------------------
