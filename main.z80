@@ -10,7 +10,6 @@
 ; Copyright 2023 Matthew Martin
 ; Licensed under the GNU GPL 3.0. See the LICENSE file for details.
 ; ------------------------------------------------------------------------------
-    INCLUDE "header.z80"
     
 ROM_SIZE:       EQU $8000
 RAM_SIZE:       EQU $8000
@@ -59,7 +58,7 @@ RAM:            DS VIRTUAL RAM_SIZE - SYSRAM_SIZE            ; Free memory for p
     ENDS
 
     SECTION RST20
-    RET
+    JP      Setup.Start
     ENDS
 
     SECTION MINT
@@ -87,7 +86,7 @@ InterruptTableTarget: DS VIRTUAL 16
 
 
     SECTION BOOT
-    LD      HL, RAM-1    				; Set stack pointer at bottom of SYSRAM
+    LD      HL, RAM-1    				    ; Set stack pointer at bottom of SYSRAM
     LD      SP, HL
 
     ; Copy the interrupt table template to RAM at $8000
@@ -148,14 +147,13 @@ StartupMessage:
     DB ASCII.FF
     DB "               Interis 64"
     DB ASCII.CR, ASCII.LF
-    DB "           System ROM v0.7.0"
+    DB "            System ROM v0.7"
     DB ASCII.CR, ASCII.LF
     DB ASCII.CR, ASCII.LF
     DB "    (C) 2023 M. Martin - GNU GPL 3.0"
     DB ASCII.CR, ASCII.LF
     DB ASCII.CR, ASCII.LF
     DB "      https://github.com/Interis64"
-    DB ASCII.CR, ASCII.LF
     DB ASCII.CR, ASCII.LF
     DB $00
 
