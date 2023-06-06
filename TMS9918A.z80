@@ -14,15 +14,19 @@ TMS9918A: PROC
 	INCLUDE "TMSFont.z80"
 
 TextScreenEnd:      EQU $17C0               ; VRAM Address one past the last char of the screen
+CursorBlinkTime:    EQU 30                  ; Cursor blink time (number of frames)
 
     SECTION SYSRAM
-
 Installed:          DS VIRTUAL 1            ; Set this to non-zero if the card is intalled and detected
-ControlPort:        DS VIRTUAL 1
-DataPort:           DS VIRTUAL 1
+ControlPort:        DS VIRTUAL 1            ; The IO address for the VDP's control port
+DataPort:           DS VIRTUAL 1            ; The IO address for the VDP's data port
 CursorPosition:     DS VIRTUAL 2            ; The VRAM address of the text cursor
 LinePosition:       DS VIRTUAL 1            ; The cursor position relative to the start of the line
-CursorChar:         DS VIRTUAL 1
+CursorChar:         DS VIRTUAL 1            ; The font character to display as the text mode cursor
+CursorBlinkEnabled: DS VIRTUAL 1            ; Non-zero if cursor blinking is enabled
+CursorCharBuffer:   DS VIRTUAL 1            ; Space to store the character thet's "under" the cursor (for blinking)
+CursorBlinkTimer:   DS VIRTUAL 1            ; Counter for making the cursor blink
+CursorVisible:      DS VIRTUAL 1            ; Non-zero if the cursor is currently visible
 LineCopyBuffer:     DS VIRTUAL 240          ; Space to copy six lines worth of text (for scrolling)
     ENDS
 
@@ -31,13 +35,12 @@ Initialize:
     LD      A, $00
     LD      (Installed), A
 
-    LD      A, $FF
+    LD      A, $FF                          ; Set the default cursor character
     LD      (CursorChar), A
+    
+    LD      A, 1                            ; Enable blinking cursor
+    LD      (CursorBlinkEnabled), A
 
-    ; Set up control port location from NVRAM config
-    ; Set up data port location from NVRAM config
-    ; LD      A, NVRAM.TMS9918A_SLOT
-    ; CALL    NVRAM.GetIOPort
     CALL    LookForCard
     LD      A, (Installed)
     CP      $00                             ; Check if the card is not installed
@@ -57,7 +60,7 @@ Initialize:
 	CALL    WriteRegister
 	
 	INC     B                               ; Register 1
-	LD      A, 11010000b                    ; 4116 RAM, No Blanking, Text Mode
+	LD      A, 11110000b                    ; 4116 RAM, Interupt Enabled, No Blanking, Text Mode
 	CALL    WriteRegister
 
 	INC     B                               ; Register 2
@@ -152,8 +155,57 @@ ClearVRAMLoopInner:
     RET
 
 IRQHandler:
+    PUSH    AF
+    CALL    ReadStatus                      ; Read the status register (clears interrupt flag)
+    LD      A, (CursorBlinkEnabled)         ; Check if blinking is enabled
+    CP      0
+    JP      Z, IRQExit                      ; If blinking is disabled, do nothing
+    LD      A, (CursorBlinkTimer)           ; Load the cursor blink timer
+    DEC     A                               ; Decrement
+    JP      NZ, IRQExit                     ; Still have time left? Do nothing
+    CALL    ToggleCursor                    ; Timer expired, toggle cursor visibility
+IRQExit:
+    POP     AF
     EI
 	RETI
+
+ToggleCursor:
+    LD      A, (CursorVisible)
+    CP      0
+    JP      Z, SetCursorVisible
+    JP      SetCursorHidden
+
+; Draw the cursor character at the current cursor position
+SetCursorVisible:
+    PUSH    AF
+    PUSH    DE
+    LD      DE, (CursorPosition)
+    CALL    ReadVRAM
+    LD      (CursorCharBuffer), A
+    LD      A, (CursorChar)
+    CALL    WriteVRAM
+    LD      A, 1
+    LD      (CursorVisible), A
+    LD      A, CursorBlinkTime
+    LD      (CursorBlinkTimer), A           ; Reset the blink timer
+    POP     DE
+    POP     AF
+    RET
+
+; Draw the screen character at the current cursor position
+SetCursorHidden:
+    PUSH    AF
+    PUSH    DE
+    LD      DE, (CursorPosition)            ; Gets the current cursor position
+    LD      A, (CursorCharBuffer)           ; Loads the buffered character from memory
+    CALL    WriteVRAM                       ; Replace the cursor char on screen
+    LD      A, 0                    
+    LD      (CursorVisible), A              ; Un-set the cursor-visible flag
+    LD      A, CursorBlinkTime
+    LD      (CursorBlinkTimer), A           ; Reset the blink timer
+    POP     DE
+    POP     AF
+    RET
 
 LookForCard:
     LD      A, $80                          ; Start looking at base address 0x80
@@ -269,7 +321,6 @@ ReadVRAM:
     POP     BC
     RET
 
-
 ; Reads data into memory addresses HL to HL + B starting at VRAM address DE
 ReadVRAMBlock:
     PUSH    AF
@@ -287,7 +338,6 @@ ReadVRAMBlock:
     POP     BC
     POP     AF
     RET
-    
 
 ; Writes the data in A to VDP register number B
 WriteRegister:
@@ -302,34 +352,38 @@ WriteRegister:
     OUT     (C), A
     RET
 
-; Prints the byte in A as an ASCII character at the cursor position
+; Writes the byte in A at the cursor position
+PutChar:
+    PUSH    DE
+    LD      DE, (CursorPosition)
+    CALL    WriteVRAM
+    POP     DE
+    RET
+
+; Prints the byte in A as an ASCII character at the cursor position and advances the cursor
 PrintChar:
     CP      ASCII.FF                        ; Handle Form Feed (clear screen)
     JP      Z, ClearVRAM
     CP      ASCII.CR                        ; Handle carriage return
     JP      Z, LineFeed
-    CP      ASCII.LF                        ; Handle line feed
+    CP      ASCII.LF                        ; Handle line feed (does nothing, handled by CR)
     RET     Z
-    ; JP      Z, PrintLF
     CP      ASCII.BACKSPACE
     JP      Z, Backspace
     PUSH    BC
     PUSH    DE
-    LD      DE, (CursorPosition)
-    PUSH    AF
-    CALL    WriteVRAM
-    LD      A, (DataPort)
-    LD      C, A
-    LD      A, (CursorChar)
-    OUT     (C), A
-    INC     DE
-    LD      (CursorPosition), DE
-    CALL    IncrementLinePosition
-    POP     AF
+    CALL    SetCursorHidden                 ; Hide the cursor so we don't lose on-screen characters
+    LD      DE, (CursorPosition)            ; Load the cursor's current position
+    CALL    WriteVRAM                       ; Write our character
+    INC     DE                              ; Increment the cursor position
+    LD      (CursorPosition), DE            ; Save cursor position
+    CALL    IncrementLinePosition           ; Increment the position on the current line
+    CALL    SetCursorVisible                ; Re-enable the cursor
     POP     DE
     POP     BC
     RET
 
+; Handles a newline (combined CR LF, just inserts blanks for the rest of the current line)
 LineFeed:
     PUSH    AF
     PUSH    BC
@@ -343,52 +397,58 @@ LineFeedLoop:
     POP     AF
     RET
 
-
+; FUTURE USE: Handle a carriage return character (return the cursor to the beginning of the line)
 PrintCR:
     PUSH    AF
-    PUSH    BC
+    PUSH    DE
+    CALL    SetCursorHidden
+    LD      DE, (CursorPosition)
     LD      A, (LinePosition)
-    LD      B, A
 PrintCRLoop:
-    LD      HL, LinePosition
-    DEC     (HL)
-    LD      HL, CursorPosition
-    DEC     (HL)
-    DJNZ    PrintCRLoop
-    POP     BC
+    CP      0
+    JP      PrintCRDone
+    DEC     DE
+    DEC     A
+    JP      PrintCRLoop
+PrintCRDone:
+    LD      (CursorPosition), DE
+    LD      (LinePosition), A
+    CALL    SetCursorVisible
+    POP     DE
     POP     AF
     RET
 
+; FUTURE USE: Handle a line-feed character (advance the cursor by 40 positions, check screen scroll)
 PrintLF:
+    PUSH    BC
     PUSH    DE
-    PUSH    HL
-
-    LD      DE, (CursorPosition)            ; Get the current cursor position
-    LD      A, " "                          ; Clear the cursor
-    CALL    WriteVRAM
-    
-    LD      HL, (CursorPosition)
-    LD      DE, 40
-    ADD     HL, DE
-    LD      (CursorPosition), HL
-    POP     HL
+    CALL    SetCursorHidden
+    LD      DE, (CursorPosition)
+    LD      B, 40
+PrintLFLoop:
+    INC     DE
+    DJNZ    PrintCRLoop
+    LD      (CursorPosition), DE
+    CALL    CheckScreenScroll
+    CALL    SetCursorVisible
     POP     DE
+    POP     BC
     RET
 
+; Handles the backspace character
 Backspace:
     PUSH    AF
     PUSH    DE
     PUSH    HL
 
+    CALL    SetCursorHidden                 ; Hide the cursor
     LD      DE, (CursorPosition)            ; Get the current cursor position
-    LD      A, " "                          ; Clear the cursor
-    CALL    WriteVRAM
     DEC     DE                              ; Go back a char
-    LD      A, (CursorChar)                 ; Overwrite with the cursor
+    LD      A, " "
     CALL    WriteVRAM
     LD      (CursorPosition), DE
     CALL    DecrementLinePosition
-
+    CALL    SetCursorVisible
     POP     HL
     POP     DE
     POP     AF
