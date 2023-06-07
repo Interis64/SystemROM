@@ -43,6 +43,8 @@ PrintString:
 
 PrintCRLF:
     LD      A, ASCII.CR
+    CALL    PrintChar
+    LD      A, ASCII.LF
     JP      PrintChar
 
 Beep:

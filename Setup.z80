@@ -12,33 +12,40 @@
 Setup: PROC
 ; ------------------------------------------------------------------------------
 
-StringBuffer: EQU $8430                     ; 16 bytes
-StringBufferLength: EQU $8440
+    SECTION SYSRAM
+StringBuffer:       DS VIRTUAL 16               ; 16 bytes
+StringBufferLength: DS VIRTUAL 1
 
-Start:
-    RET
+    ENDS
+
+
+Init:
     CALL  	NVRAM.ValidateChecksum
     JP    	NZ, ChecksumFail
-    ; Print prompt on screen
-    LD    	HL, Strings.Prompt
-    CALL  	Utils.PrintString
-    CALL  	BufferedInput.Read
-    CP    	$1B                             ; Test for ESC character
-    JP    	Z, EnterSetup
+    RET
+
+Start:
+    ; Clear Screen
     LD		A, ASCII.FF
     RST		$08
+
+    LD      A, TMS9918A.Installed
+    CP      $00
+    CALL    NZ, SetupVDPColors
     RET
     
+SetupVDPColors:
+    LD      HL, Strings.BGColorPrompt
+    CALL    Utils.PrintString
+
+    RET
+
 ChecksumFail:
     LD    	HL, Strings.InvalidChecksum
     CALL  	Utils.PrintString
     CALL  	BufferedInput.Read
     CP      ASCII.CR
     
-EnterSetup:
-    ; CALL  SetSystemTime
-    RST     $00                             ; Reset the machine to pick up changed hardware
-
 SetSystemTime:
     PUSH    HL
     LD      HL, Strings.SysDateLabel
@@ -92,64 +99,11 @@ InDigitCR:
     LD      A, $00
     RET
 
-SetupHardware:
-    LD      HL, Strings.HardwarePromptTMS
-    LD      B, NVRAM.TMS9918A_SLOT
-    CALL    SetupSlot
-
-    LD      HL, Strings.HardwarePromptOPL
-    LD      B, NVRAM.OPL2_SLOT
-    CALL    SetupSlot
-
-    LD      HL, Strings.HardwarePromptFDC
-    LD      B, NVRAM.DISK_SLOT
-    CALL    SetupSlot
-
-    CALL    NVRAM.UpdateChecksum
-
-    RET
-
-SetupSlot:
-    CALL    Utils.PrintString
-    CALL    InputSlotNumber
-    CALL    NVRAM.WriteRaw
-    JP      Utils.PrintCRLF
-
-; Waits for the user to type a slot number, echos it, returns the slot number in A
-; If it's a CR, ignore. If it's a LF, return $FF in A
-InputSlotNumber:    
-    CALL    BufferedInput.Read
-    CP      ASCII.CR
-    JP      Z, InputSlotNumberCR
-    CP      ASCII.LF                        ; Ignore LF
-    JP      Z, InputSlotNumber
-    CP      '4'
-    JP      C, InputSlotNumber
-    CP      '7'+1
-    JP      NC, InputSlotNumber
-    RST     $08
-    RET
-InputSlotNumberCR:
-    LD      HL, Strings.NotInstalled
-    CALL    Utils.PrintString
-    LD      A, $FF
-    RET
-
-; ------------------------------------------------------------------------------
-
-HARDWARE_MENU_TABLE:
-    DW Strings.HardwarePromptTMS
-    DW Strings.HardwarePromptOPL
-    DW Strings.HardwarePromptFDC
-
 
 ; ------------------------------------------------------------------------------
 
 Strings: PROC
 
-Prompt:
-    DB "Press ESC for system setup.", ASCII.CR
-    DB "Any other key to continue.", ASCII.CR, $00
 InvalidChecksum:
     DB "NVRAM Checksum Invalid. Press a key to enter system setup", ASCII.CR, $00
     
@@ -166,15 +120,28 @@ SysTimeLabel:
 NewTimePrompt:
     DB "New Time (HHMMSS):", ASCII.CR, $00
 
-HardwarePromptTMS:
-    DB "TMS9918A Graphics Slot: ", $00
-HardwarePromptOPL:
-    DB "       OPL2 Sound Slot: ", $00
-HardwarePromptFDC:
-    DB "      Floppy Disk Slot: ", $00
+BGColorPrompt:
+    DB "Background Color: ", $00
+FGColorPrompt:
+    DB "Foreground Color: ", $00
 
-NotInstalled:
-    DB  "Not Installed", $00
+ColorNames:
+    DB  "    None"
+    DB  "   Black"
+    DB  "Md Green"
+    DB  "Lt Green"
+    DB  " Dk Blue"
+    DB  " Lt Blue"
+    DB  "Dark Red"
+    DB  "    Cyan"
+    DB  " Med Red"
+    DB  "Lite Red"
+    DB  "DkYellow"
+    DB  "LtYellow"
+    DB  "Dk Green"
+    DB  " Magenta"
+    DB  "    Gray"
+    DB  "   White"
 
     ENDP
 

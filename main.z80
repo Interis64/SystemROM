@@ -54,11 +54,11 @@ RAM:            DS VIRTUAL RAM_SIZE - SYSRAM_SIZE            ; Free memory for p
     ENDS
 
     SECTION RST18
-    RET
+    JP      BufferedInput.IsCharAvailable
     ENDS
 
     SECTION RST20
-    JP      Setup.Start
+    JP      Monitor.DebugHandler
     ENDS
 
     SECTION MINT

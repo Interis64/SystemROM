@@ -26,7 +26,7 @@ DataBufferLength:       EQU $A018                               ; Memory locatio
 DataStartAddress:       EQU $A019                               ; Memory location for the Memory Editor start address
 DataBuffer:             EQU $A020                               ; Memory location for the data buffer (23 bytes)
 
-; If we got here from an external NMI, then we'll swap out the registers
+; If we got here from a non-maskable interrupt, then we'll swap out the registers
 ; so we don't clobber the running program. When the Monitor exits, we
 ; swap them back and give control back.
 NMIHandler:
@@ -40,6 +40,21 @@ NMIHandler:
     EXX
     EX      AF, AF'
     RETN
+
+; If we got here from an external call, then we'll swap out the registers
+; so we don't clobber the running program. When the Monitor exits, we
+; swap them back and give control back.
+DebugHandler:
+    EX      AF, AF'
+    EXX
+
+    ; Call instead of jump, so we put this return address on the stack
+    CALL    ControlLoop
+    
+    ; When the user quits the monitor, we'll pick up here
+    EXX
+    EX      AF, AF'
+    RET
 
 Start:
     LD      HL, $0000                       ; Push $0000 to the stack so we do a cold reset on a quit command
@@ -103,6 +118,9 @@ AcceptBackspace:
 ; Process Input - Decides what to do based on the user's input
 ; -------------------------------------
 ProcessInput:
+    ; LD      A, ASCII.LF
+    ; RST     $08
+    ; RST     $08
     LD      HL, CommandBuffer
     LD      A, (HL)
     CP      'M'
@@ -138,6 +156,8 @@ ProcessMemoryEditorCommand:
     EX      DE, HL
     LD      (DataStartAddress), HL
 
+    LD      A, ASCII.LF
+    RST     $08
     ; Fall through to ME_ControlLoop (Tail Call)
 
 ME_ControlLoop:
@@ -148,7 +168,8 @@ ME_ControlLoop:
 
 ; Prints out 8 bytes of memory from the current address pointer as hex
 ME_DumpMemory:
-    CALL    Utils.PrintCRLF
+    LD      A, ASCII.CR
+    RST     $08
     LD      HL, (DataStartAddress)          ; Get the address pointer
     PUSH    HL                              ; Copy to DE
     POP     DE
@@ -366,6 +387,7 @@ ProcessQuitCommand:
     LD      A, (CommandBufferLength)        ; Check command length
     CP      1                               ; 1 byte
     JP      NZ, CommandError
+    CALL    Utils.PrintCRLF
     POP     HL                              ; Pop off our monitor return address
     RET                                     ; Return to the previous address (outside of Monitor)
 

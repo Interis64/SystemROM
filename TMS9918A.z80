@@ -46,21 +46,26 @@ Initialize:
     CP      $00                             ; Check if the card is not installed
     RET     Z                               ; Bail out if card is not installed
 
-    DEC     A                               ; Get back to base address
-    SLA     A                               ; A << 4 to get IRQ number
-    SLA     A
-    SLA     A
-    SLA     A
-    LD      H, $80                          ; Point HL at the interrupt table
-    LD      L, A                            ; location for this IRQ number
-    LD      (HL), IRQHandler                ; Plop our IRQ routine pointer there
+    LD      A, (DataPort)                   ; Load the IO address into A
+    SRL     A                               ; A >> 4 to get IRQ number
+    SRL     A
+    SRL     A
+    SRL     A
+    LD      HL, InterruptTableTarget        ; Point HL at the interrupt table
+    LD      D, 0
+    LD      E, A
+    ADD     HL, DE                          ; Add enough for this slot
+    LD      DE, IRQHandler
+    LD      (HL), E                         ; Plop our IRQ routine pointer there
+    INC     HL
+    LD      (HL), D
 
 	LD      B, $00                          ; Register 0
 	LD      A, 00000000b                    ; Disable Mode3, Disable External VDP
 	CALL    WriteRegister
 	
 	INC     B                               ; Register 1
-	LD      A, 11110000b                    ; 4116 RAM, Interupt Enabled, No Blanking, Text Mode
+	LD      A, 11010000b                    ; 4116 RAM, No Blanking, Interupt Enabled, Text Mode
 	CALL    WriteRegister
 
 	INC     B                               ; Register 2
@@ -163,7 +168,7 @@ IRQHandler:
     LD      A, (CursorBlinkTimer)           ; Load the cursor blink timer
     DEC     A                               ; Decrement
     JP      NZ, IRQExit                     ; Still have time left? Do nothing
-    CALL    ToggleCursor                    ; Timer expired, toggle cursor visibility
+    ; CALL    ToggleCursor                    ; Timer expired, toggle cursor visibility
 IRQExit:
     POP     AF
     EI
@@ -352,22 +357,14 @@ WriteRegister:
     OUT     (C), A
     RET
 
-; Writes the byte in A at the cursor position
-PutChar:
-    PUSH    DE
-    LD      DE, (CursorPosition)
-    CALL    WriteVRAM
-    POP     DE
-    RET
-
 ; Prints the byte in A as an ASCII character at the cursor position and advances the cursor
 PrintChar:
     CP      ASCII.FF                        ; Handle Form Feed (clear screen)
     JP      Z, ClearVRAM
     CP      ASCII.CR                        ; Handle carriage return
-    JP      Z, LineFeed
-    CP      ASCII.LF                        ; Handle line feed (does nothing, handled by CR)
-    RET     Z
+    JP      Z, PrintCR
+    CP      ASCII.LF                        ; Handle line feed
+    JP      Z, PrintLF
     CP      ASCII.BACKSPACE
     JP      Z, Backspace
     PUSH    BC
@@ -383,21 +380,7 @@ PrintChar:
     POP     BC
     RET
 
-; Handles a newline (combined CR LF, just inserts blanks for the rest of the current line)
-LineFeed:
-    PUSH    AF
-    PUSH    BC
-LineFeedLoop:
-    LD      A, " "
-    CALL    PrintChar
-    LD      A, (LinePosition)
-    CP      0
-    JR      NZ, LineFeedLoop
-    POP     BC
-    POP     AF
-    RET
-
-; FUTURE USE: Handle a carriage return character (return the cursor to the beginning of the line)
+; Handle a carriage return (return the cursor to the beginning of the line)
 PrintCR:
     PUSH    AF
     PUSH    DE
@@ -406,7 +389,7 @@ PrintCR:
     LD      A, (LinePosition)
 PrintCRLoop:
     CP      0
-    JP      PrintCRDone
+    JP      Z, PrintCRDone
     DEC     DE
     DEC     A
     JP      PrintCRLoop
@@ -418,7 +401,7 @@ PrintCRDone:
     POP     AF
     RET
 
-; FUTURE USE: Handle a line-feed character (advance the cursor by 40 positions, check screen scroll)
+; Handle a line-feed (advance the cursor by one line, check screen scroll)
 PrintLF:
     PUSH    BC
     PUSH    DE
@@ -427,7 +410,7 @@ PrintLF:
     LD      B, 40
 PrintLFLoop:
     INC     DE
-    DJNZ    PrintCRLoop
+    DJNZ    PrintLFLoop
     LD      (CursorPosition), DE
     CALL    CheckScreenScroll
     CALL    SetCursorVisible
@@ -499,6 +482,7 @@ CheckScreenScroll:
     RET     C                               ; Not at the end of the screen, nothing to do
 
     PUSH    AF
+    PUSH    BC
     PUSH    DE
     PUSH    HL
 
@@ -538,11 +522,15 @@ CheckScreenScroll:
     LD      B, 240
     CALL    WriteVRAMBlock
 
-    LD      HL, $1798
+    LD      HL, (CursorPosition)
+    LD      B, 40
+    DEC     HL
+    DJNZ    $-1
     LD      (CursorPosition), HL
     
     POP     HL
     POP     DE
+    POP     BC
     POP     AF
     RET
 

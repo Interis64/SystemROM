@@ -64,7 +64,7 @@ IRQHandler:
     JP      NC, IRQExit
 
     CP      $76                             ; If we hit escape,
-    CALL    Z, TestGoSetup                ; check the soft reset chord
+    CALL    Z, TestGoSetup                  ; check the soft reset chord
 
     LD      (ScanCode), A
 
@@ -72,7 +72,7 @@ IRQHandler:
     BIT     4, A
     JP      Z, AcceptKey
     RES     Flag_Release, A                 ; Reset the KeyRelease flag
-    SET     Flag_Released, A                 ; Reset the KeyReleased flag
+    SET     Flag_Released, A                ; Reset the KeyReleased flag
     LD      (Flags), A
     JP      IRQExit
 
@@ -102,6 +102,7 @@ TranslateScanCode:
     PUSH    AF
 SkipCtrl:
     POP     AF
+    CP      0
     CALL    NZ, BufferedInput.Accept        ; Accept it if we have a nonzero character
     ; Continue through to IRQExit
     CP      ASCII.CR
@@ -125,7 +126,7 @@ TestGoSetup:
     JP      Z, SkipGoSetup
     BIT     Flag_Ctrl, A
     JP      Z, SkipGoSetup
-    RST     $20
+    CALL    Setup.Start
 SkipGoSetup:
     POP     AF
     RET

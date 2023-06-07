@@ -125,20 +125,20 @@ Lowercase:
     DB  $00
     DB  $00
     DB  $00
-    DB  '0'         ; 70 (F070) - 0
-    DB  '.'         ; 71 (F071) - .
-    DB  '2'         ; 72 (F072) - 2
+    DB  '0'         ; 70 (F070) - Insert (Keypad 0)
+    DB  '.'         ; 71 (F071) - Delete (Keypad .)
+    DB  $91         ; 72 (F072) - Down Arrow (Keypad 2)
     DB  '5'         ; 73 (F073) - 5
-    DB  '6'         ; 74 (F074) - 6
-    DB  '8'         ; 75 (F075) - 8
+    DB  $93         ; 74 (F074) - Right Arrow (Keypad 6)
+    DB  $90         ; 75 (F075) - Up Arrow (Keypad 8)
     DB  $1B         ; 76 (F076) - ESC
     DB  $00         ; 77 (F077) - Num Lock
     DB  $00         ; 78 (F078) - F11
-    DB  '+'         ; 79 (F079) - +
-    DB  '3'         ; 7A (F07A) - 3
-    DB  '-'         ; 7B (F07B) - -
-    DB  '*'         ; 7C (F07C) - *
-    DB  '9'         ; 7D (F07D) - 9
+    DB  '+'         ; 79 (F079) - Keypad +
+    DB  '3'         ; 7A (F07A) - Page Down (Keypad 3)
+    DB  '-'         ; 7B (F07B) - Keypad -
+    DB  '*'         ; 7C (F07C) - Keypad *
+    DB  '9'         ; 7D (F07D) - Page Up (Keypad 9)
     DB  $00         ; 7E (F07E) - Scroll Lock
     DB  $00
     DB  $00
