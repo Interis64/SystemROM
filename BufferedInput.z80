@@ -50,10 +50,12 @@ notWrap:
       LD    (WR_POINTER), HL
       POP   AF
       LD    (HL), A
+      PUSH  AF
       LD    A, (BUFFER_USED)
       INC   A
       LD    (BUFFER_USED), A
       CP    FULLSIZE
+      POP   AF
       RET
 
 Read:

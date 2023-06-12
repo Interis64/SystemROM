@@ -94,7 +94,7 @@ AcceptInputLoop:
     CP      CommandBufferMax
     JP      Z, AcceptInputLoop              ; If we're at max size, do nothing
     LD      A, B
-    CALL    Utils.PrintChar                 ; Echo back to the screen
+    RST     $08                 ; Echo back to the screen
     LD      (HL), A                         ; Stuff in the command buffer
     INC     HL                              ; Move to the next location
     LD      A, (CommandBufferLength)        ; Increment our length counter
@@ -161,58 +161,66 @@ ProcessMemoryEditorCommand:
     ; Fall through to ME_ControlLoop (Tail Call)
 
 ME_ControlLoop:
-    CALL    ME_DumpMemory
+    CALL    ME_PrintMemory
     CALL    ME_AcceptInput
     CALL    ME_ProcessInput
     JP      ME_ControlLoop
 
 ; Prints out 8 bytes of memory from the current address pointer as hex
-ME_DumpMemory:
+ME_PrintMemory:
     LD      A, ASCII.CR
+    RST     $08
+    LD      A, '['
     RST     $08
     LD      HL, (DataStartAddress)          ; Get the address pointer
     PUSH    HL                              ; Copy to DE
     POP     DE
-    LD      A, '['
-    CALL    Utils.PrintChar
     CALL    PrintHexWord                    ; Print address pointer
     LD      A, ']'
-    CALL    Utils.PrintChar
+    RST     $08
 
     LD      B, 8
-ME_DumpMemoryLoop:
+ME_PrintMemoryLoop:
     LD      A, ' '
-    CALL    Utils.PrintChar
+    RST     $08
     LD      A, (HL)
     CALL    PrintHexByte
     INC     HL
-    DJNZ    ME_DumpMemoryLoop
+    DJNZ    ME_PrintMemoryLoop
     RET
 
 ME_AcceptInput:
+    LD      A, ' '                          ; Clear out the input buffer with blanks
+    LD      HL, DataBuffer
+    LD      B, DataBufferMax
+ME_ClearInputBufferLoop:
+    LD      (HL), A
+    INC     HL
+    DJNZ    ME_ClearInputBufferLoop
+    XOR     A                               ; Set the buffer length to zero
+    LD      (DataBufferLength), A
+
     LD      HL, DataPrompt                  ; Print our prompt
     CALL    Utils.PrintString
-    XOR     A                               ; Zero out the length
-    LD      (DataBufferLength), A        
-    LD      HL, DataBuffer                  ; Point HL at the command buffer
+    LD      HL, DataBuffer                  ; Point HL at the data buffer
 ME_AcceptInputLoop:
     CALL    BufferedInput.Read
-    CP      ASCII.LF                        ; Ignore LF character
-    JP      Z, ME_AcceptInputLoop
     CP      ASCII.CR                        ; CR completes input
     RET     Z                               ; So return out of the input loop
+    CP      ASCII.LF                        ; Ignore LF character
+    JP      Z, ME_AcceptInputLoop
     CP      ASCII.BACKSPACE                 ; Handle Backspace
     JP      Z, ME_AcceptBackspace
     CP      ASCII.ESCAPE
     JP      Z, ME_AcceptEscape              ; Esc key handler
 
-    LD      B, A
+    LD      B, A                            ; Temporary store of input char
     LD      A, (DataBufferLength)           ; Check if we're at the max input size
     CP      DataBufferMax
     JP      Z, ME_AcceptInputLoop           ; If we're at max size, do nothing
-    LD      A, B
-    CALL    Utils.PrintChar                 ; Echo back to the screen
-    LD      (HL), A                         ; Stuff into the command buffer
+    LD      A, B                            ; Restore input char
+    RST     $08                             ; Echo back to the screen
+    LD      (HL), A                         ; Stuff into the data buffer
     INC     HL                              ; Move to the next location
     LD      A, (DataBufferLength)           ; Increment our length counter
     INC     A
@@ -230,7 +238,7 @@ ME_AcceptEscape:
 ME_AcceptBackspace:
     LD      A, (DataBufferLength)           ; Load our length counter
     CP      $00                             ; If we're at zero length, can't backspace
-    JP      Z, ME_AcceptInputLoop              ; So just go back to our input loop
+    JP      Z, ME_AcceptInputLoop           ; So just go back to our input loop
     LD      A, ASCII.BACKSPACE              ;
     RST     $08                             ; Output the backspace char
     DEC     HL                              ; Go back a spot
@@ -257,6 +265,7 @@ ME_ProcessInput:
     CALL    ME_CheckDataByte
 
     LD      HL, DataBuffer
+    LD      DE, (DataStartAddress)
     CALL    ME_UpdateDataByte
     CALL    ME_UpdateDataByte
     CALL    ME_UpdateDataByte
@@ -266,7 +275,6 @@ ME_ProcessInput:
     CALL    ME_UpdateDataByte
     CALL    ME_UpdateDataByte
 
-    CALL    ME_DecrementAddress
     RET
 
 ME_IncrementAddress:
@@ -282,27 +290,21 @@ ME_IncrementAddress:
     LD      (DataStartAddress), HL
     RET
 
-ME_DecrementAddress:
-    LD      HL, (DataStartAddress)
-    DEC     HL
-    DEC     HL
-    DEC     HL
-    DEC     HL
-    DEC     HL
-    DEC     HL
-    DEC     HL
-    DEC     HL
-    LD      (DataStartAddress), HL
-    RET
-
 ME_CheckDataByte:
     LD      A, (HL)
+    CP      ' '
+    JP      Z, ME_CheckDataByteSkip
     CALL    TestHexDigitSpace
     JP      PO, ME_DataError
     INC     HL
     LD      A, (HL)
     CALL    TestHexDigitSpace
     JP      PO, ME_DataError
+    INC     HL
+    INC     HL
+    RET
+ME_CheckDataByteSkip:
+    INC     HL
     INC     HL
     INC     HL
     RET
@@ -312,15 +314,12 @@ ME_UpdateDataByte:
     CP      ' '
     JP      Z, ME_UpdateDataByteSkip
     CALL    ReadHexByte
-    PUSH    HL
-    LD      HL, (DataStartAddress)
-    LD      (HL), A                         ; Store the new value
-    INC     HL
-    LD      (DataStartAddress), HL          ; Increment the address pointer
-    POP     HL
+    LD      (DE), A                         ; Store the new value
+    INC     DE
     INC     HL                              ; Skip the space after the value
     RET
 ME_UpdateDataByteSkip:
+    INC     DE
     INC     HL
     INC     HL
     INC     HL
@@ -369,7 +368,7 @@ ProcessDumpCommand:
 
 DumpLoop:
     LD      A, (HL)
-    CALL    Utils.PrintChar
+    RST     $08
     INC     HL
     DEC     BC
     LD      A, B
@@ -473,18 +472,24 @@ PrintHexNibble:
 ; Afterwards, you can do this:
 ; 	jp po,not_found
 TestHexDigit:
+    PUSH    HL
     LD      HL, HexDigits
     LD      BC, 22                          ; 22 possible characters
     CPIR
+    POP     HL
     RET
 
 ; Tests if A contains a valid hex digit or a space
 ; Afterwards, you can do this:
 ; 	jp po,not_found
 TestHexDigitSpace:
+    PUSH    HL
+    PUSH    BC
     LD      HL, HexDigits
     LD      BC, 23                          ; 23 possible characters
     CPIR
+    POP     BC
+    POP     HL
     RET
 
 HexDigits:
