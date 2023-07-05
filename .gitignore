@@ -1,2 +1,3 @@
-.bin
-.swp
+*.bin
+*.swp
+.DS_Store
