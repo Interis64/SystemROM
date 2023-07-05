@@ -1,5 +1,5 @@
 ; ------------------------------------------------------------------------------
-; FloppyDisk.z80
+; FDC/Driver.z80
 ; ------------------------------------------------------------------------------
 ; WD37C65C Floppy Disk Drive controller support.
 ; ------------------------------------------------------------------------------
@@ -15,26 +15,26 @@
 ; 135 TPI, 80 tracks, 18 sectors per track
 ; 300 RPM, 500 kbps
 ; ------------------------------------------------------------------------------
-FloppyDisk:         PROC
+    ORG $EC00                               ; Data Storage drivers get loaded to RAM at $EC00
 
-SLOT:               EQU SLOT5
+SLOT:               DS  1 ; EQU SLOT5
 
-PORT_MSR:           EQU SLOT + $10
-PORT_TC:            EQU SLOT + $05
-PORT_LDCR:          EQU SLOT + $09              
-PORT_CS:            EQU SLOT + $11
-PORT_LDOR:          EQU SLOT + $19
-PORT_DISK_CHG:      EQU SLOT + $1C          ; Data bit 7 will contain the /DC signal
+PORT_MSR:           DS  1 ; EQU SLOT + $10
+PORT_TC:            DS  1 ; SLOT + $05
+PORT_LDCR:          DS  1 ; EQU SLOT + $09              
+PORT_CS:            DS  1 ; EQU SLOT + $11
+PORT_LDOR:          DS  1 ; EQU SLOT + $19
+PORT_DISK_CHG:      DS  1 ; EQU SLOT + $1C  ; Data bit 7 will contain the /DC signal
 
-BootCodeAddress:    EQU $9000               ; Address the boot sector should be loaded into
+BootCodeAddress:    EQU $0100               ; Address the boot sector should be loaded into
 
 ; RAM Locations
-DataBuffer:         EQU $8500               ; Starting address for read/write sector data (pointer to 512 byte block)
-DriveNumber:        EQU DataBuffer   + 2    ; should be $00 or $01
-TrackNumber:        EQU DriveNumber  + 1
-HeadNumber:         EQU TrackNumber  + 1    ; should be $00 or $01
-SectorNumber:       EQU HeadNumber   + 1
-StatusBytes:        EQU SectorNumber + 1    ; Storage for result status bytes (4 bytes)
+DataBuffer:         DS  512                 ; Starting address for read/write sector data (pointer to 512 byte block)
+DriveNumber:        DS  1                   ; should be $00 or $01
+TrackNumber:        DS  1
+HeadNumber:         DS  1                   ; should be $00 or $01
+SectorNumber:       DS  1
+StatusBytes:        DS  4                   ; Storage for result status bytes (4 bytes)
 
 ; ------------------------------------------------------------------------------
 ; N, SC, GPL Values
@@ -49,13 +49,6 @@ StatusBytes:        EQU SectorNumber + 1    ; Storage for result status bytes (4
 ; DRV x
 ; RPM 1
 
-Initialize:
-    CALL    ResetFDC
-    CALL    SelectDrive0
-    CALL    Specify
-    CALL    Recalibrate
-    CALL    DeselectDrives
-    RET
 
 ; -------------------------------------
 ; Soft-Reset the Floppy Controller
@@ -120,18 +113,11 @@ WriteDataRegisterWaitLoop:
     RET
 
 ; -------------------------------------
-; Select Drive 0
+; Select Drive
 ; -------------------------------------
-SelectDrive0:
-    LD      A, 00010100b
-    OUT     (PORT_LDOR), A
-    RET
-
-; -------------------------------------
-; Select Drive 1
-; -------------------------------------
-SelectDrive1:
-    LD      A, 00100101b
+SelectDrive:
+    LD      A, (DriveNumber)
+    OR      00010100b
     OUT     (PORT_LDOR), A
     RET
 
@@ -373,8 +359,7 @@ ClearLoop2:
     ; Point the data buffer to our bootstrap location
     LD      HL, BootCodeAddress
     LD      (DataBuffer), HL
-
-    CALL    SelectDrive0
+    CALL    SelectDrive
     CALL    Seek
     CALL    ReadSector
     CALL    DeselectDrives
@@ -393,6 +378,4 @@ ClearLoop2:
     
     JP      BootCodeAddress     ; Otherwise, we got a good read, so jump to the boot sector code in RAM
 
-; ------------------------------------------------------------------------------
-	ENDP
 ; ------------------------------------------------------------------------------

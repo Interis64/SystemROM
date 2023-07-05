@@ -1,0 +1,241 @@
+; ------------------------------------------------------------------------------
+; opl2.z80
+; ------------------------------------------------------------------------------
+; Support for Yamaha YM3812 (OPL-II) FM Synthesis chip.
+; ------------------------------------------------------------------------------
+; Interis 64 Z80 Computer
+; https://github.com/Interis64
+; 
+; Copyright 2023 Matthew Martin
+; Licensed under the GNU GPL 3.0. See the LICENSE file for details.
+; ------------------------------------------------------------------------------
+OPL2: PROC
+; ------------------------------------------------------------------------------
+
+Installed:      EQU $8300
+AddressPort:    EQU $8301
+DataPort:       EQU $8302
+
+; Register numbers
+R_TEST:         EQU $00                     ; Test Data / OPL2 Waveform Enable (bit5)
+R_TIMER1:       EQU $01                     ; Timer 1
+R_TIMER2:       EQU $02                     ; Timer 2
+R_TIMERC:       EQU $04                     ; Timer Control
+R_CSMKSP:       EQU $08                     ; CSM Speech Synth / Key Split Note
+R_PARAM1:       EQU $20                     ; AM / Vib / EG Type / Key Scale / Multiple 
+R_PARAM2:       EQU $40                     ; Key Scaling Level / Output Level
+R_PARAM3:       EQU $60                     ; Attack Rate / Decay Rate
+R_PARAM4:       EQU $80                     ; Sustain Level / Release Rate
+R_FREQ:         EQU $A0                     ; Frequency (low 8 bits)
+R_OOF:          EQU $B0                     ; Note ON/OFF / Octave / Frequency (high 2 bits)
+R_AMVIBR:       EQU $BD                     ; AM Depth / Vibrato Depth / Rhythm Control
+R_FEEDBK:       EQU $C0                     ; Feedback Strength 
+R_WAVE:         EQU $E0                     ; Waveform Select
+
+; ------------------------------------------------------------------------------
+Initialize: ; Initialize the OPL2
+    ; Clear the installed flag (this will be set based on tests later in the init routine)
+    LD      A, $00
+    LD      (Installed), A
+
+    ; Set up control port location from NVRAM config
+    ; Set up data port location from NVRAM config
+    LD      A, NVRAM.OPL2_SLOT
+    CALL    NVRAM.GetIOPort
+    CP      $FF                             ; Check if the port is $FF (not installed)
+    RET     Z                               ; Bail out if card is not installed
+    LD      (AddressPort), A                ; Store base address as data port
+    INC     A
+    LD      (DataPort), A                   ; Store base address + 1 as control port
+
+    DEC     A                               ; Get back to base address
+    SRA     A                               ; A >> 4 to get IRQ number
+    SRA     A
+    SRA     A
+    SRA     A
+    AND     $0F
+    LD      H, $80                          ; Point HL at the interrupt table
+    LD      L, A                            ; location for this IRQ number
+    LD      (HL), IRQHandler                ; Plop our IRQ routine pointer there
+
+    CALL    ResetAll
+
+    LD      H, R_TEST                       ; Reg $00: Test Information
+    LD      L, 00010000b                    ; Set D5 to 1 to enable OPL2 waves
+    CALL    WriteRegister
+
+    LD      H, R_TIMERC                     ; Reg $04: Timer Control
+    LD      L, 10000000b                    ; Reset both timers
+    CALL    WriteRegister
+
+    LD      H, R_CSMKSP                     ; REG $08: CSM Sel / Key Spl
+    LD      L, 00000000b                    ; CSM Off, (no idea about Key Spl)
+    CALL    WriteRegister
+
+    LD      H, $BD                          ; Reg $BD: AM / Vib / Rhythm
+    LD      L, 00000000b                    ; AM Weak, Vib Weak, Rhythm Off
+    CALL    WriteRegister
+
+; ------------------------------------------------------------------------------
+;                          Detecting a Sound Card
+;
+;   According to the AdLib manual, the 'official' method of checking for a 
+;   sound card is as follows:
+;
+;      1)  Reset both timers by writing 60h to register 4.
+;      2)  Enable the interrupts by writing 80h to register 4.  NOTE: this
+;          must be a separate step from number 1.
+;      3)  Read the status register (port 388h).  Store the result.
+;      4)  Write FFh to register 2 (Timer 1).
+;      5)  Start timer 1 by writing 21h to register 4.
+;      6)  Delay for at least 80 microseconds.
+;      7)  Read the status register (port 388h).  Store the result.
+;      8)  Reset both timers and interrupts (see steps 1 and 2).
+;      9)  Test the stored results of steps 3 and 7 by ANDing them
+;          with E0h.  The result of step 3 should be 00h, and the 
+;          result of step 7 should be C0h.  If both are correct, an
+;          AdLib-compatible board is installed in the computer.
+; ------------------------------------------------------------------------------
+VerifyCardInstalled:
+
+    LD      HL, $0460
+    CALL    WriteRegister
+
+    LD      HL, $0480
+    CALL    WriteRegister
+
+    LD      A, (AddressPort)                ; Read status register
+    LD      C, A
+    IN      A, (C)
+    AND     $E0
+    CP      $00
+    RET     NZ
+
+    LD      HL, $02FF
+    CALL    WriteRegister
+
+    LD      HL, $0421
+    CALL    WriteRegister
+
+    DI                                      ; Disable interrupts so we don't get stuck in here
+
+    ; Delay 80µs
+    LD      B, $10                          ; Run this loop 16 times (811 T-states total, about 110 µs)
+VerifyTimerDelay:
+    EX      (SP), HL                        ; 19 T-states
+    EX      (SP), HL                        ; 19 T-states
+    DJNZ    VerifyTimerDelay                ; 13/8 T-states
+
+    LD      A, (AddressPort)                ; Read status register
+    LD      C, A
+    IN      A, (C)
+
+    LD      HL, $0460
+    CALL    WriteRegister
+
+    LD      HL, $0480
+    CALL    WriteRegister
+
+    EI                                      ; Reenable interrupts
+
+    AND     $E0
+    CP      $C0
+    RET     NZ
+
+    LD      A, $01
+    LD      (Installed), A
+
+    RET
+
+IRQHandler:
+    EI
+    RETI
+    
+; ------------------------------------------------------------------------------
+; A quick sound test routine to see if things are actually working
+; ------------------------------------------------------------------------------
+Beep:
+; Set the modulator's multiple to 1
+    LD      HL, $2001
+    CALL    WriteRegister
+
+; Set the modulator's level to about 40 dB
+    LD      HL, $403F
+    CALL    WriteRegister
+
+; Modulator attack:  quick;   decay:   long
+    LD      HL, $60F4
+    CALL    WriteRegister
+
+; Modulator sustain: medium;  release: medium
+    LD      HL, $807F
+    CALL    WriteRegister
+; Set voice frequency's LSB (it'll be a D#)
+    LD      HL, $A098
+    CALL    WriteRegister
+
+; Set the carrier's multiple to 1
+    LD      HL, $2301
+    CALL    WriteRegister
+
+; Set the carrier to maximum volume (about 47 dB)
+    LD      HL, $4300
+    CALL    WriteRegister
+
+; Carrier attack:  quick;   decay:   long
+    LD      HL, $63F0
+    CALL    WriteRegister
+
+; Carrier sustain: medium;  release: medium
+    LD      HL, $837F
+    CALL    WriteRegister
+
+; Turn the voice on; set the octave and freq MSB
+    LD      HL, $B036
+    CALL    WriteRegister
+
+; Wait.
+    LD      B, $00
+WaitLoop:
+    PUSH    BC
+    LD      B, $00
+    DJNZ    $
+    POP     BC
+    DJNZ    WaitLoop
+    
+; Turn the voice off
+    LD      HL, $B011
+    JP    WriteRegister
+
+; Accept register address in H, value in L
+WriteRegister:
+    PUSH    AF
+    PUSH    BC
+    LD      A, (AddressPort)
+    LD      C, A
+    LD      A, H
+    OUT     (C), A
+    LD      B, $04
+    DJNZ    $
+    LD      A, (DataPort)
+    LD      C, A
+    LD      A, L
+    OUT     (C), A
+    LD      B, $0E
+    DJNZ    $
+    POP     BC
+    POP     AF
+    RET
+
+ResetAll:
+    LD      L, $00
+    LD      H, $01
+ResetLoop:
+    CALL    WriteRegister
+    INC     H
+    LD      A, H
+    CP      0
+    RET     Z
+    JP      ResetLoop
+
+    ENDP

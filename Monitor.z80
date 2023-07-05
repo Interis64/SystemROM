@@ -19,12 +19,12 @@ Monitor: PROC
 ; ------------------------------------------------------------------------------
 
 CommandBufferMax:       EQU 16                                  ; Max of 16 chars for commands
-CommandBufferLength:    EQU $A000                               ; Memory location for the current size of the command buffer
-CommandBuffer:          EQU $A001                               ; Memory location for the command buffer (16 bytes)
+CommandBufferLength:    DS  1                                   ; Memory location for the current size of the command buffer
+CommandBuffer:          DS  CommandBufferMax                    ; Memory location for the command buffer (16 bytes)
 DataBufferMax:          EQU 23                                  ; Max of 23 chars for data (8 hex bytes with spaces between)
-DataBufferLength:       EQU $A018                               ; Memory location for the current size of the data buffer
-DataStartAddress:       EQU $A019                               ; Memory location for the Memory Editor start address
-DataBuffer:             EQU $A020                               ; Memory location for the data buffer (23 bytes)
+DataBufferLength:       DS  1                                   ; Memory location for the current size of the data buffer
+DataStartAddress:       DS  2                                   ; Memory location for the Memory Editor start address
+DataBuffer:             DS  DataBufferMax                       ; Memory location for the data buffer (23 bytes)
 
 ; If we got here from a non-maskable interrupt, then we'll swap out the registers
 ; so we don't clobber the running program. When the Monitor exits, we
@@ -83,10 +83,10 @@ AcceptInputLoop:
     CP      ASCII.CR                        ; CR completes input
     RET     Z
 
-    CP      ASCII.BACKSPACE                 ; Handle Backspace
+    CP      ASCII.BS                        ; Handle Backspace
     JP      Z, AcceptBackspace
 
-    CP      ASCII.ESCAPE
+    CP      ASCII.ESC
     JP      Z, AcceptInput                  ; Esc key aborts the current line and prompts again
 
     LD      B, A
@@ -106,7 +106,7 @@ AcceptBackspace:
     LD      A, (CommandBufferLength)        ; Load our length counter
     CP      $00                             ; If we're at zero length, can't backspace
     JP      Z, AcceptInputLoop              ; So just go back to our input loop
-    LD      A, ASCII.BACKSPACE              ;
+    LD      A, ASCII.BS                     ;
     RST     $08                             ; Output the backspace char
     DEC     HL                              ; Go back a spot
     LD      A, (CommandBufferLength)        ; Decrement our length counter
@@ -209,9 +209,9 @@ ME_AcceptInputLoop:
     RET     Z                               ; So return out of the input loop
     CP      ASCII.LF                        ; Ignore LF character
     JP      Z, ME_AcceptInputLoop
-    CP      ASCII.BACKSPACE                 ; Handle Backspace
+    CP      ASCII.BS                        ; Handle Backspace
     JP      Z, ME_AcceptBackspace
-    CP      ASCII.ESCAPE
+    CP      ASCII.ESC
     JP      Z, ME_AcceptEscape              ; Esc key handler
 
     LD      B, A                            ; Temporary store of input char
@@ -239,7 +239,7 @@ ME_AcceptBackspace:
     LD      A, (DataBufferLength)           ; Load our length counter
     CP      $00                             ; If we're at zero length, can't backspace
     JP      Z, ME_AcceptInputLoop           ; So just go back to our input loop
-    LD      A, ASCII.BACKSPACE              ;
+    LD      A, ASCII.BS                     ;
     RST     $08                             ; Output the backspace char
     DEC     HL                              ; Go back a spot
     LD      A, (DataBufferLength)           ; Decrement our length counter

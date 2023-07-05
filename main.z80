@@ -1,19 +1,4 @@
-; ------------------------------------------------------------------------------
-; main.z80
-; ------------------------------------------------------------------------------
-; Main system ROM. This is essentially layout and framework, with the actual
-; executable code mostly living in separate files.
-; ------------------------------------------------------------------------------
-; Interis 64 Z80 Computer
-; https://github.com/Interis64
-; 
-; Copyright 2023 Matthew Martin
-; Licensed under the GNU GPL 3.0. See the LICENSE file for details.
-; ------------------------------------------------------------------------------
-    
-ROM_SIZE:       EQU $8000
-RAM_SIZE:       EQU $8000
-SYSRAM_SIZE:    EQU $800
+SystemRAMBase:  EQU $EC00
 
 ; I/O Addresses for each hardware slot
 SLOT0:          EQU $00
@@ -34,131 +19,40 @@ RST28:          DS $08
 RST30:          DS $08
 MINT:           DS $2E                      ; Region for the maskable interrupt handler
 NMIH:           DS $9A                      ; Region for the non-maskable interrupt handler
-InterruptTable: DS $10                      ; Interrupt Mode 2 vector table
-BOOT:           DS $0060                    ; Region for POST code
-UTIL:           DS $2000                    ; Region for utility functions
-PROG:           DS ROM_SIZE - $             ; Region for the rest of the ROM
-SYSRAM:         DS VIRTUAL SYSRAM_SIZE            ; Reserved memory for system driver use
-RAM:            DS VIRTUAL RAM_SIZE - SYSRAM_SIZE            ; Free memory for programs, etc
 
-    SECTION RST00                           ; Reset to $00: Hard reset
-    JP      BOOT                            ; Start cold-boot sequence
-    ENDS
-
-    SECTION RST08
-    JP      Utils.PrintChar
+    SECTION RST00
+    JP      ROMBoot
     ENDS
 
     SECTION RST10
-    JP      BufferedInput.Read
+    JP      Syscall
     ENDS
 
-    SECTION RST18
-    JP      BufferedInput.IsCharAvailable
-    ENDS
+ROMBoot:
+    ; Set up the stack pointer
+    LD      HL, SystemRAMBase               ; SP address is at the bottom of the system in RAM
+    LD      SP, HL                          ; Set the stack pointer
 
-    SECTION RST20
-    JP      Monitor.DebugHandler
-    ENDS
+    ; Copy system template to top of RAM
+    LD      BC, $10000 - SysTemplateStart   ; Get the system size
+    LD      DE, SystemRAMBase               ; Set the system destination address
+    LD      HL, SysTemplateStart            ; Point HL
+    LDI                                     ; Copy everything
 
-    SECTION MINT
-    RETI
-    ENDS
+    ; Copy root template to temp space at $8000
+    LD      BC, $0100
+    LD      HL, $8000
+    LD      DE, $0000
+    LDIR
 
-    SECTION NMIH
-    JP      Monitor.NMIHandler
-    ENDS
+    ; Find and initialize hardware
+    CALL    VDP.Initialize
+;    CALL    OPL.Initialize
+    CALL    FDC.Initialize
+    JP      ColdBoot
 
-    SECTION InterruptTable
-INT0: DW NullInterruptHandler
-INT1: DW PS2Keyboard.IRQHandler
-INT2: DW Serial.IRQHandler
-INT3: DW NullInterruptHandler
-INT4: DW NullInterruptHandler
-INT5: DW NullInterruptHandler
-INT6: DW NullInterruptHandler
-INT7: DW NullInterruptHandler
-    ENDS
+    INCLUDE "VDP/Init.z80"
+;    INCLUDE "OPL/Init.z80"
+    INCLUDE "FDC/Init.z80"
 
-    SECTION SYSRAM
-InterruptTableTarget: DS VIRTUAL 16
-    ENDS
-
-
-    SECTION BOOT
-    LD      HL, RAM-1    				    ; Set stack pointer at bottom of SYSRAM
-    LD      SP, HL
-
-    ; Copy the interrupt table template to RAM at $8000
-    LD      BC, $0010                       ; Table is 16 bytes long
-    LD      HL, InterruptTable              ; From (HL)
-    LD      DE, InterruptTableTarget        ; To (DE)
-    LDIR                                    ; Copy
-
-    IM      2                               ; Interrupt Mode 2
-    LD      HL, InterruptTableTarget
-    LD      A, H                            ; Point to the interrupt table
-    LD      I, A
-    EI                                      ; Enable interrupts
-
-    CALL    Utils.Initialize
-    CALL    NVRAM.Initialize
-    CALL    BufferedInput.Initialize
-    CALL    PS2Keyboard.Initialize
-    CALL    Serial.Initialize
-
-    CALL  	NVRAM.ValidateChecksum          ; Check the NVRAM and if it's bad, skip optional hardware
-    JP    	NZ, SkipOptionalHardware        ; We'll force setup when the machine boots
-
-    CALL    TMS9918A.Initialize
-    CALL    OPL2.Initialize
-    CALL    FloppyDisk.Initialize
-    
-SkipOptionalHardware:
-
-    CALL    Utils.Beep
-
-    ; Show the startup banner
-    LD      HL, StartupMessage
-    CALL    Utils.PrintString
-    CALL    FloppyDisk.Boot                 ; Try booting from a floppy if we've got one
-
-    JP      PROG
-    ENDS
-
-    SECTION UTIL
-NullInterruptHandler:
-    EI
-    RETI
-
-    INCLUDE "Utils.z80"
-    INCLUDE "ASCII.z80"
-    INCLUDE "BufferedInput.z80"
-    INCLUDE "NVRAM.z80"
-    INCLUDE "PS2Keyboard.z80"
-    INCLUDE "Serial.z80"
-    INCLUDE "OPL2.z80"
-    INCLUDE "TMS9918A.z80"
-    INCLUDE "FloppyDisk.z80"
-    INCLUDE "Setup.z80"
-    INCLUDE "Monitor.z80"
-
-StartupMessage:
-    DB ASCII.FF
-    DB "               Interis 64"
-    DB ASCII.CR, ASCII.LF
-    DB "            System ROM v0.7"
-    DB ASCII.CR, ASCII.LF
-    DB ASCII.CR, ASCII.LF
-    DB "    (C) 2023 M. Martin - GNU GPL 3.0"
-    DB ASCII.CR, ASCII.LF
-    DB ASCII.CR, ASCII.LF
-    DB "      https://github.com/Interis64"
-    DB ASCII.CR, ASCII.LF
-    DB $00
-
-    ENDS
-
-    SECTION PROG
-    JP      Monitor.Start
-    ENDS
+    INCLUDE "UpperRAMSystem.z80"

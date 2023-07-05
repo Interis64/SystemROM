@@ -1,7 +1,7 @@
 ; ------------------------------------------------------------------------------
-; TMS9918A.z80
+; VDP/Driver.z80
 ; ------------------------------------------------------------------------------
-; TMS9918A video card support
+; TMS9918A video card in-memory driver
 ; ------------------------------------------------------------------------------
 ; Interis 64 Z80 Computer
 ; https://github.com/Interis64
@@ -9,111 +9,21 @@
 ; Copyright 2023 Matthew Martin
 ; Licensed under the GNU GPL 3.0. See the LICENSE file for details.
 ; ------------------------------------------------------------------------------
-TMS9918A: PROC
-; ------------------------------------------------------------------------------
-	INCLUDE "TMSFont.z80"
+    ORG $F400                               ; Video drivers get loaded to RAM at $F400
 
 TextScreenEnd:      EQU $17C0               ; VRAM Address one past the last char of the screen
 CursorBlinkTime:    EQU 30                  ; Cursor blink time (number of frames)
 
-    SECTION SYSRAM
-Installed:          DS VIRTUAL 1            ; Set this to non-zero if the card is intalled and detected
-ControlPort:        DS VIRTUAL 1            ; The IO address for the VDP's control port
-DataPort:           DS VIRTUAL 1            ; The IO address for the VDP's data port
-CursorPosition:     DS VIRTUAL 2            ; The VRAM address of the text cursor
-LinePosition:       DS VIRTUAL 1            ; The cursor position relative to the start of the line
-CursorChar:         DS VIRTUAL 1            ; The font character to display as the text mode cursor
-CursorBlinkEnabled: DS VIRTUAL 1            ; Non-zero if cursor blinking is enabled
-CursorCharBuffer:   DS VIRTUAL 1            ; Space to store the character thet's "under" the cursor (for blinking)
-CursorBlinkTimer:   DS VIRTUAL 1            ; Counter for making the cursor blink
-CursorVisible:      DS VIRTUAL 1            ; Non-zero if the cursor is currently visible
-LineCopyBuffer:     DS VIRTUAL 240          ; Space to copy six lines worth of text (for scrolling)
-    ENDS
-
-Initialize:
-    ; Clear the installed flag (this will be set based on tests later in the init routine)
-    LD      A, $00
-    LD      (Installed), A
-
-    LD      A, $FF                          ; Set the default cursor character
-    LD      (CursorChar), A
-    
-    LD      A, 1                            ; Enable blinking cursor
-    LD      (CursorBlinkEnabled), A
-
-    CALL    LookForCard
-    LD      A, (Installed)
-    CP      $00                             ; Check if the card is not installed
-    RET     Z                               ; Bail out if card is not installed
-
-    LD      A, (DataPort)                   ; Load the IO address into A
-    SRL     A                               ; A >> 4 to get IRQ number
-    SRL     A
-    SRL     A
-    SRL     A
-    LD      HL, InterruptTableTarget        ; Point HL at the interrupt table
-    LD      D, 0
-    LD      E, A
-    ADD     HL, DE                          ; Add enough for this slot
-    LD      DE, IRQHandler
-    LD      (HL), E                         ; Plop our IRQ routine pointer there
-    INC     HL
-    LD      (HL), D
-
-	LD      B, $00                          ; Register 0
-	LD      A, 00000000b                    ; Disable Mode3, Disable External VDP
-	CALL    WriteRegister
-	
-	INC     B                               ; Register 1
-	LD      A, 11010000b                    ; 4116 RAM, No Blanking, Interupt Enabled, Text Mode
-	CALL    WriteRegister
-
-	INC     B                               ; Register 2
-	LD      A, $05                          ; Pattern Name Table Base Address 0x1400
-	CALL    WriteRegister
-
-	INC     B                               ; Register 3
-	LD      A, $80                          ; Color Table Base Address 0x2000
-	CALL    WriteRegister
-
-	INC     B                               ; Register 4
-	LD      A, $01                          ; Pattern Generator Base Address 0x0800
-	CALL    WriteRegister
-
-	INC     B                               ; Register 5
-	LD      A, $20                          ; Sprite Attribute Table Base Address 0x1000
-	CALL    WriteRegister
-
-	INC     B                               ; Register 6
-	LD      A, $00                          ; Sprite Pattern Generator Base Address 0x0000
-	CALL    WriteRegister
-
-; TODO: Load color config from NVRAM
-
-	INC     B                               ; Register 7
-	LD      A, $1F                          ; Text Color 1 / Text Color 0/Backdrop
-	CALL    WriteRegister
-
-
-    LD      A, (ControlPort)
-    LD      C, A
-	LD      A, $00                          ; Set low byte of VRAM address 0x00
-	OUT     (C), A
-	LD      A, $48                          ; Set high byte of VRAM address 0x08
-	OUT     (C), A
-	
-	LD      HL, TMSFont                     ; Load address of font
-	LD      B, $00
-    LD      A, (DataPort)
-	LD      C, A                            ; Write character glyphs to pattern table
-	OTIR
-	OTIR
-	OTIR
-	OTIR
-	OTIR
-	OTIR
-	OTIR
-	OTIR
+ControlPort:        DS 1                    ; The IO address for the VDP's control port
+DataPort:           DS 1                    ; The IO address for the VDP's data port
+CursorPosition:     DS 2                    ; The VRAM address of the text cursor
+LinePosition:       DS 1                    ; The cursor position relative to the start of the line
+CursorChar:         DS 1                    ; The font character to display as the text mode cursor
+CursorBlinkEnabled: DS 1                    ; Non-zero if cursor blinking is enabled
+CursorCharBuffer:   DS 1                    ; Space to store the character thet's "under" the cursor (for blinking)
+CursorBlinkTimer:   DS 1                    ; Counter for making the cursor blink
+CursorVisible:      DS 1                    ; Non-zero if the cursor is currently visible
+LineCopyBuffer:     DS 240                  ; Space to copy six lines worth of text (for scrolling)
 
 ClearVRAM:
     PUSH    AF
@@ -210,59 +120,6 @@ SetCursorHidden:
     LD      (CursorBlinkTimer), A           ; Reset the blink timer
     POP     DE
     POP     AF
-    RET
-
-LookForCard:
-    LD      A, $80                          ; Start looking at base address 0x80
-LookForCardLoop:
-    LD      (DataPort), A                   ; Store base address as data port
-    INC     A
-    LD      (ControlPort), A                ; Store base address + 1 as control port
-
-    PUSH    AF
-    CALL    CheckCardExists                 ; Writes and reads back some VRAM to validate the card
-    JP      Z, FoundCard
-    POP     AF
-
-    CP      $E1
-    RET     NC
-    ADD     A, $1F
-    JP      LookForCardLoop
-
-FoundCard:
-    LD      A, $01
-    LD      (Installed), A
-    POP     AF
-    RET
-
-
-CheckCardExists:
-    LD      DE, $1400
-    LD      A, $00
-    CALL    WriteVRAM
-    CALL    ReadVRAM
-    CP      $00
-    RET     NZ                              ; Values don't match, so bail
-
-    LD      DE, $1400
-    LD      A, $55
-    CALL    WriteVRAM
-    CALL    ReadVRAM
-    CP      $55
-    RET     NZ                              ; Values don't match, so bail
-
-    LD      DE, $1400
-    LD      A, $AA
-    CALL    WriteVRAM
-    CALL    ReadVRAM
-    CP      $AA
-    RET     NZ                              ; Values don't match, so bail
-
-    LD      DE, $1400
-    LD      A, $FF
-    CALL    WriteVRAM
-    CALL    ReadVRAM
-    CP      $FF
     RET
 
 ; Writes A to the VRAM location DE
@@ -365,7 +222,7 @@ PrintChar:
     JP      Z, PrintCR
     CP      ASCII.LF                        ; Handle line feed
     JP      Z, PrintLF
-    CP      ASCII.BACKSPACE
+    CP      ASCII.BS
     JP      Z, Backspace
     PUSH    BC
     PUSH    DE
@@ -534,6 +391,4 @@ CheckScreenScroll:
     POP     AF
     RET
 
-; ------------------------------------------------------------------------------
-	ENDP
 ; ------------------------------------------------------------------------------

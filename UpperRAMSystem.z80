@@ -1,0 +1,79 @@
+; ------------------------------------------------------------------------------
+; UpperRAMSystem.z80
+; ------------------------------------------------------------------------------
+; This is the entirety of the system stuff that gets loaded to the top of RAM
+; at system startup time
+; ------------------------------------------------------------------------------
+    ORG SystemRAMBase
+
+SysTemplateStart:
+
+VideoDriver:
+    DS  $400
+SoundDriver:
+    DS  $400
+StorageDriver:
+    DS  $400
+System:
+    DS  $700
+SyscallTable:
+    DS  $80
+    INCLUDE "SyscallTable.z80"
+
+SyscallTarget:  DS 1
+ScratchPad:     DS $6B
+HardwareID4:    DS 1
+HardwareID5:    DS 1
+HardwareID6:    DS 1
+HardwareID7:    DS 1
+
+InterruptTable:                             ; Interrupt Mode 2 vector table
+    DW NullInterruptHandler
+    DW PS2Keyboard.IRQHandler
+    DW Serial.IRQHandler
+    DW NullInterruptHandler
+    DW NullInterruptHandler
+    DW NullInterruptHandler
+    DW NullInterruptHandler
+    DW NullInterruptHandler
+
+    SECTION System
+ColdBoot:
+    ; Turn on 64K mode
+    LD      A, 1
+    OUT     (0), A
+
+    ; Copy the base RAM template over
+    LD      BC, $0100
+    LD      HL, $8000
+    LD      DE, $0000
+    LDIR
+    
+    ; Continue with warm boot
+WarmBoot:
+    ; Clear screen
+    ; Print welcome messages
+    ; Attempt to boot from storage driver
+    ; If not, fall back to the monitor
+    JP      Monitor.Start
+
+Syscall:
+    PUSH    AF
+    LD      A, (SyscallTarget)
+    LD      IY, SyscallTable
+    ADD     A, IYL
+    LD      IYL, A
+    POP     AF
+    JP      (IY)
+
+NullInterruptHandler:
+    RETI
+
+    INCLUDE "Monitor.z80"
+    INCLUDE "BufferedInput.z80"
+    INCLUDE "NVRAM.z80"
+    INCLUDE "ASCII.z80"
+    INCLUDE "Serial.z80"
+    INCLUDE "Utils.z80"
+    INCLUDE "PS2Keyboard.z80"
+    ENDS

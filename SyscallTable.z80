@@ -1,0 +1,25 @@
+    
+    SECTION SyscallTable
+
+    DW  ColdBoot                            ; $00 - Cold Boot
+    DW  WarmBoot                            ; $02 - Warm Boot
+    DW  Monitor.DebugHandler                ; $04 - Start Debug Monitor
+    DW  Serial.TXA                          ; $06 - Print character to output device
+    DW  Utils.PrintString                   ; $08 - Print null-terminated string to output device
+    DW  BufferedInput.Read                  ; $0A - Read a character from BufferedInput
+    DW  BufferedInput.IsCharAvailable       ; $0C - Check if there's a character available in BufferedInput
+    DW  NVRAM.Beep                          ; $0E - System Bell
+    DW  BufferedInput.Read                  ; $10 - NVRAM Read Byte
+    DW  BufferedInput.IsCharAvailable       ; $12 - NVRAM Write Byte
+
+; The following will be populated by the driver for the hardware in each slot
+HardwareCallSlot4:
+    DS  16
+HardwareCallSlot5:
+    DS  16
+HardwareCallSlot6:
+    DS  16
+HardwareCallSlot7:
+    DS  16
+
+    ENDS

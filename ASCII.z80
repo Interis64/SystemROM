@@ -15,7 +15,7 @@ BELL:       EQU $07         ; System Beep
 CR:         EQU $0D         ; Carriage Return
 LF:         EQU $0A         ; Line Feed
 FF:         EQU $0C         ; Clear screen
-BACKSPACE:  EQU $08         ; Backspace
-ESCAPE:     EQU $1B         ; Escape
+BS:         EQU $08         ; Backspace
+ESC:        EQU $1B         ; Escape
 
             ENDP

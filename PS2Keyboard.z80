@@ -63,9 +63,6 @@ IRQHandler:
     CP      $84                             ; See if we're past the end of the scan code table
     JP      NC, IRQExit
 
-    CP      $76                             ; If we hit escape,
-    CALL    Z, TestGoSetup                  ; check the soft reset chord
-
     LD      (ScanCode), A
 
     LD      A, (Flags)
@@ -118,18 +115,6 @@ IRQExit:
     POP     AF
     EI
     RETI
-
-TestGoSetup:
-    PUSH    AF
-    LD      A, (Flags)
-    BIT     Flag_Shift, A
-    JP      Z, SkipGoSetup
-    BIT     Flag_Ctrl, A
-    JP      Z, SkipGoSetup
-    CALL    Setup.Start
-SkipGoSetup:
-    POP     AF
-    RET
 
 KeyReleased:
     LD      A, (Flags)

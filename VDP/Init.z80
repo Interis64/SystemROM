@@ -1,0 +1,236 @@
+; ------------------------------------------------------------------------------
+; VDP/Init.z80
+; ------------------------------------------------------------------------------
+; TMS9918A video card support, initializaton routine
+;
+; This will look for the video card in each of the slots. Once found, it will
+; set the hardware ID in the hardware table, install the driver in RAM, and take
+; over any relevant syscalls.
+; ------------------------------------------------------------------------------
+; Interis 64 Z80 Computer
+; https://github.com/Interis64
+; 
+; Copyright 2023 Matthew Martin
+; Licensed under the GNU GPL 3.0. See the LICENSE file for details.
+; ------------------------------------------------------------------------------
+VDP:    PROC
+
+; Temporary variables
+InitInstalled:      EQU $8000
+InitControlPort:    EQU $8001
+InitDataPort:       EQU $8002
+
+Initialize:
+    ; Clear the installed flag (this will be set based on tests later in the init routine)
+    LD      A, $00
+    LD      (InitInstalled), A
+
+    CALL    LookForCard
+    LD      A, (InitInstalled)
+    CP      $00                             ; Check if the card is not installed
+    RET     Z                               ; Bail out if card is not installed
+
+    LD      BC, DriverEnd - DriverStart     ; Get the driver size
+    LD      DE, $F400                       ; Set the driver destination address
+    LD      HL, DriverStart                 ; Set the driver source address
+    LDIR
+
+    ; Install system call overrides
+    LD      HL, PrintChar
+    LD      (SyscallTable + $06), HL        ; Override PrintChar
+
+    ; TODO: Set the hardware ID byte for the corresponding slot
+
+    ; Copy I/O addresses to the driver
+    LD      A, (InitControlPort)
+    LD      (ControlPort), A
+    LD      A, (InitDataPort)
+    LD      (DataPort), A
+
+    LD      A, $FF                          ; Set the default cursor character
+    LD      (CursorChar), A
+    
+    LD      A, 1                            ; Enable blinking cursor
+    LD      (CursorBlinkEnabled), A
+
+    LD      A, (DataPort)               ; Load the IO address into A
+    SRL     A                               ; A >> 4 to get IRQ number
+    SRL     A
+    SRL     A
+    SRL     A
+    LD      HL, $FFF0                       ; Point HL at the interrupt table
+    LD      D, 0
+    LD      E, A
+    ADD     HL, DE                          ; Add enough for this slot
+    LD      DE, IRQHandler
+    LD      (HL), E                         ; Plop our IRQ routine pointer there
+    INC     HL
+    LD      (HL), D
+
+	LD      B, $00                          ; Register 0
+	LD      A, 00000000b                    ; Disable Mode3, Disable External VDP
+	CALL    WriteRegister
+	
+	INC     B                               ; Register 1
+	LD      A, 11010000b                    ; 4116 RAM, No Blanking, Interupt Enabled, Text Mode
+	CALL    WriteRegister
+
+	INC     B                               ; Register 2
+	LD      A, $05                          ; Pattern Name Table Base Address 0x1400
+	CALL    WriteRegister
+
+	INC     B                               ; Register 3
+	LD      A, $80                          ; Color Table Base Address 0x2000
+	CALL    WriteRegister
+
+	INC     B                               ; Register 4
+	LD      A, $01                          ; Pattern Generator Base Address 0x0800
+	CALL    WriteRegister
+
+	INC     B                               ; Register 5
+	LD      A, $20                          ; Sprite Attribute Table Base Address 0x1000
+	CALL    WriteRegister
+
+	INC     B                               ; Register 6
+	LD      A, $00                          ; Sprite Pattern Generator Base Address 0x0000
+	CALL    WriteRegister
+
+; TODO: Load color config from NVRAM
+
+	INC     B                               ; Register 7
+	LD      A, $1F                          ; Text Color 1 / Text Color 0/Backdrop
+	CALL    WriteRegister
+
+
+    LD      A, (ControlPort)
+    LD      C, A
+	LD      A, $00                          ; Set low byte of VRAM address 0x00
+	OUT     (C), A
+	LD      A, $48                          ; Set high byte of VRAM address 0x08
+	OUT     (C), A
+	
+	LD      HL, VDPFont                     ; Load address of font
+	LD      B, $00
+    LD      A, (DataPort)
+	LD      C, A                            ; Write character glyphs to pattern table
+	OTIR
+	OTIR
+	OTIR
+	OTIR
+	OTIR
+	OTIR
+	OTIR
+	OTIR
+
+    RET
+
+LookForCard:
+    LD      A, $80                          ; Start looking at base address 0x80
+LookForCardLoop:
+    LD      (InitDataPort), A                   ; Store base address as data port
+    INC     A
+    LD      (InitControlPort), A                ; Store base address + 1 as control port
+
+    PUSH    AF
+    CALL    CheckCardExists                 ; Writes and reads back some VRAM to validate the card
+    JP      Z, FoundCard
+    POP     AF
+
+    CP      $E1
+    RET     NC
+    ADD     A, $1F
+    JP      LookForCardLoop
+
+FoundCard:
+    LD      A, $01
+    LD      (InitInstalled), A
+    POP     AF
+    RET
+
+
+CheckCardExists:
+    LD      DE, $1400
+    LD      A, $00
+    CALL    InitWriteVRAM
+    CALL    InitReadVRAM
+    CP      $00
+    RET     NZ                              ; Values don't match, so bail
+
+    LD      DE, $1400
+    LD      A, $55
+    CALL    InitWriteVRAM
+    CALL    InitReadVRAM
+    CP      $55
+    RET     NZ                              ; Values don't match, so bail
+
+    LD      DE, $1400
+    LD      A, $AA
+    CALL    InitWriteVRAM
+    CALL    InitReadVRAM
+    CP      $AA
+    RET     NZ                              ; Values don't match, so bail
+
+    LD      DE, $1400
+    LD      A, $FF
+    CALL    InitWriteVRAM
+    CALL    InitReadVRAM
+    CP      $FF
+    RET
+
+; Writes the data in A to VDP register number B
+InitWriteRegister:
+    PUSH    AF
+    LD      A, (InitControlPort)
+    LD      C, A
+    POP     AF
+    OUT     (C), A
+    LD      A, B
+    AND     00000111b
+    OR      10000000b
+    OUT     (C), A
+    RET
+
+; Writes A to the VRAM location DE
+InitWriteVRAM:
+    PUSH    BC
+    PUSH    AF
+    LD      A, (InitControlPort)
+    LD      C, A
+	LD      A, E
+	OUT     (C), A
+	LD      A, D
+	AND     00111111b
+	OR      01000000b
+	OUT     (C), A
+    LD      A, (InitDataPort)
+    LD      C, A
+	POP     AF
+	OUT     (C), A
+    POP     BC
+    RET
+
+; Reads A from the VRAM location DE
+InitReadVRAM:
+    PUSH    BC
+    LD      A, (InitControlPort)
+    LD      C, A
+	LD      A, E
+	OUT     (C), A
+	LD      A, D
+	AND     00111111b
+	OUT     (C), A
+    LD      A, (InitDataPort)
+    LD      C, A
+	IN      A, (C)
+    POP     BC
+    RET
+
+    INCLUDE "Font.z80"
+
+DriverStart:
+    INCLUDE "Driver.z80"
+DriverEnd:
+
+    ENDP
+    
+

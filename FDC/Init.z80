@@ -1,0 +1,60 @@
+; ------------------------------------------------------------------------------
+; FDC/Init.z80
+; ------------------------------------------------------------------------------
+; WD37C65C Floppy Disk Controller initialization routines
+; ------------------------------------------------------------------------------
+; Interis 64 Z80 Computer
+; https://github.com/Interis64
+; 
+; Copyright 2023 Matthew Martin
+; Licensed under the GNU GPL 3.0. See the LICENSE file for details.
+; ------------------------------------------------------------------------------
+; Floppy Disk Format Specs
+; 3.5" Disks
+; Double-Sided, High Density, MFM encoding
+; 135 TPI, 80 tracks, 18 sectors per track
+; 300 RPM, 500 kbps
+; ------------------------------------------------------------------------------
+FDC:         PROC
+
+InitInstalled:      EQU $8000
+
+Initialize:
+
+    ; Clear the installed flag (this will be set based on tests later in the init routine)
+    LD      A, $00
+    LD      (InitInstalled), A
+
+    CALL    LookForCard
+    LD      A, (InitInstalled)
+    CP      $00                             ; Check if the card is not installed
+    RET     Z                               ; Bail out if card is not installed
+
+    LD      BC, DriverEnd - Driver          ; Get the driver size
+    LD      DE, $F400                       ; Set the driver destination address
+    LD      HL, Driver                      ; Set the driver source address
+    LDIR
+
+    CALL    ResetFDC
+    XOR     A
+    LD      (DriveNumber), A
+    CALL    SelectDrive
+    CALL    Specify
+    CALL    Recalibrate
+    CALL    DeselectDrives
+
+    ; TODO: Install syscall routines
+    ; TODO: Set the hardware ID byte for the corresponding slot
+
+    RET
+
+LookForCard:
+    RET
+
+Driver:
+    INCLUDE "Driver.z80"
+DriverEnd:
+
+; ------------------------------------------------------------------------------
+	ENDP
+; ------------------------------------------------------------------------------

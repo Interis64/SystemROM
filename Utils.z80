@@ -12,47 +12,25 @@
 Utils: PROC
 ; ------------------------------------------------------------------------------
 
-; Reset harware installed flags so things go to serial I/O prior to hardware init
-Initialize:
-    XOR     A
-    LD      (TMS9918A.Installed), A
-    LD      (OPL2.Installed), A
-    RET
-
-PrintChar:
-    CP      ASCII.BELL
-    JP      Z, Beep
-    PUSH    AF
-    LD      A, (TMS9918A.Installed)         ; Check if we have the TMS9918A installed
-    CP      0
-    JP      NZ, VDPPrint                    ; If so, print the output there
-    POP     AF
-    JP      Serial.TXA                      ; Otherwise, write it to serial
-VDPPrint:
-    POP     AF
-    JP      TMS9918A.PrintChar
-
-
 PrintString:
+    LD      A, $06                          ; Set syscall $06
+    LD      (SyscallTarget), A
     LD      A, (HL)                         ; Get character
     OR      A                               ; Is it $00 ?
     RET     Z                               ; If so, then we're at the end and can return
-    CALL    PrintChar                         ; Print it
+    RST     $10                             ; Print it
     INC     HL                              ; Next Character
     JR      PrintString                     ; Continue until $00
 
 PrintCRLF:
+    LD      A, $06                          ; Set syscall $06
+    LD      (SyscallTarget), A
     LD      A, ASCII.CR
-    CALL    PrintChar
+    RST     $10
     LD      A, ASCII.LF
-    JP      PrintChar
-
-Beep:
-    LD      A, (OPL2.Installed)             ; Check if we have an OPL2 installed
-    CP      0
-    JP      NZ, OPL2.Beep                   ; If so, send the beep there
-    JP      NVRAM.Beep                      ; Otherwise, use the NVRAM buzzer
-
+    RST     $10
+    RET
+    
 ; Busy-wait for (DE * 17.4)µs
 Delay:
     LD      A, 7                            ;  7 T

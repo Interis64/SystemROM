@@ -16,10 +16,10 @@ BUFFER_SIZE:      EQU   $3F
 FULLSIZE:         EQU   BUFFER_SIZE - $0F
 EMPTYSIZE:        EQU   $05
 
-BUFFER:           EQU   $8100
-WR_POINTER:       EQU   BUFFER + BUFFER_SIZE
-RD_POINTER:       EQU   WR_POINTER + 2
-BUFFER_USED:      EQU   RD_POINTER + 2
+BUFFER:           DS    BUFFER_SIZE
+WR_POINTER:       DS    2
+RD_POINTER:       DS    2
+BUFFER_USED:      DS    1
 
 
 Initialize:
