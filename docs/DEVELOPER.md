@@ -22,7 +22,16 @@ The information in this document will be invaluable to developers writing softwa
 
 ## System Calls
 
-| Call Number | Function |
-| ----------- | ----------- |
-|         $00 | Title |
-|         $02 | Text |
+| Call Number | Function                                                |
+| ----------- | ------------------------------------------------------- |
+|         $00 | Cold Boot                                               |
+|         $02 | Warm Boot                                               |
+|         $04 | Start Debug Monitor                                     |
+|         $06 | Print character to output device                        |
+|         $08 | Print null-terminated string to output device           |
+|         $0A | Read a character from BufferedInput                     |
+|         $0C | Check if there's a character available in BufferedInput |
+|         $0E | Write a character into the input buffer                 |
+|         $10 | System Bell                                             |
+|         $12 | NVRAM Read Byte                                         |
+|         $14 | NVRAM Write Byte                                        |

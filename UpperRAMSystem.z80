@@ -17,8 +17,8 @@ StorageDriver:
 System:
     DS  $700
 SyscallTable:
-    DS  $80
     INCLUDE "SyscallTable.z80"
+    DS  $80 - ($ - SyscallTable)            ; Pad out the table to account for unused calls
 
 SyscallTarget:  DS 1
 ScratchPad:     DS $6B

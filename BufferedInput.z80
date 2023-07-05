@@ -21,7 +21,6 @@ WR_POINTER:       DS    2
 RD_POINTER:       DS    2
 BUFFER_USED:      DS    1
 
-
 Initialize:
       ; Set up the input buffer
       LD    HL, BUFFER
