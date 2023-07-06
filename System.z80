@@ -15,7 +15,7 @@ SoundDriver:
 StorageDriver:
     DS  $400
 System:
-    DS  $700
+    DS  $B00
 SyscallTable:
     INCLUDE "SyscallTable.z80"
     DS  $80 - ($ - SyscallTable)            ; Pad out the table to account for unused calls
@@ -49,11 +49,12 @@ ColdBoot:
     LD      DE, $0000
     LDIR
     
+    CALL    PS2Keyboard.Initialize
+    CALL    Serial.Initialize
+    
     ; Continue with warm boot
 WarmBoot:
     CALL    BufferedInput.Initialize
-    CALL    PS2Keyboard.Initialize
-    CALL    Serial.Initialize
 
     ; Clear screen
     LD      A, Syscall.PrintChar

@@ -9,7 +9,7 @@
 ; Copyright 2023 Matthew Martin
 ; Licensed under the GNU GPL 3.0. See the LICENSE file for details.
 ; ------------------------------------------------------------------------------
-    ORG $F400                               ; Video drivers get loaded to RAM at $F400
+    ORG $F000                               ; Video drivers get loaded to RAM at $F400
 
 TextScreenEnd:      EQU $17C0               ; VRAM Address one past the last char of the screen
 CursorBlinkTime:    EQU 30                  ; Cursor blink time (number of frames)

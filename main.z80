@@ -1,4 +1,4 @@
-SystemRAMBase:  EQU $EC00
+SystemRAMBase:  EQU $E800
 
 ; I/O Addresses for each hardware slot
 SLOT0:          EQU $00
@@ -55,4 +55,4 @@ ROMBoot:
 ;    INCLUDE "OPL/Init.z80"
     INCLUDE "FDC/Init.z80"
 
-    INCLUDE "UpperRAMSystem.z80"
+    INCLUDE "System.z80"

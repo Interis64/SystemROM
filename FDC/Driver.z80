@@ -15,7 +15,7 @@
 ; 135 TPI, 80 tracks, 18 sectors per track
 ; 300 RPM, 500 kbps
 ; ------------------------------------------------------------------------------
-    ORG $EC00                               ; Data Storage drivers get loaded to RAM at $EC00
+    ORG $E8f00                               ; Data Storage drivers get loaded to RAM at $EC00
 
 SLOT:               DS  1 ; EQU SLOT5
 
@@ -29,7 +29,7 @@ PORT_DISK_CHG:      DS  1 ; EQU SLOT + $1C  ; Data bit 7 will contain the /DC si
 BootCodeAddress:    EQU $0100               ; Address the boot sector should be loaded into
 
 ; RAM Locations
-DataBuffer:         DS  512                 ; Starting address for read/write sector data (pointer to 512 byte block)
+DataBuffer:         DS  2                   ; Starting address for read/write sector data (pointer to 512 byte block)
 DriveNumber:        DS  1                   ; should be $00 or $01
 TrackNumber:        DS  1
 HeadNumber:         DS  1                   ; should be $00 or $01
@@ -259,9 +259,9 @@ ReadSector:
     LD      A, $FF
     CALL    WriteDataRegister
 
-; **********************************
-; ADD CODE TO HANDLE NO SECTOR FOUND
-; **********************************
+; ****************************************
+; TODO: ADD CODE TO HANDLE NO SECTOR FOUND
+; ****************************************
 
 
     ; Execution Phase, transfer data into buffer
@@ -334,19 +334,6 @@ ReadSectorDataComplete:
 ; Then transfer execution to that code if it exists
 ; -------------------------------------
 Boot:
-    ; Clear the read buffer
-    LD      B, 0
-    LD      HL, BootCodeAddress
-ClearLoop:
-    LD      (HL), $00
-    INC     HL
-    DJNZ    ClearLoop
-ClearLoop2:
-    LD      (HL), $00
-    INC     HL
-    DJNZ    ClearLoop2
-
-
     LD      HL, DriveNumber
     LD      (HL), $00
     LD      HL, TrackNumber
@@ -366,8 +353,8 @@ ClearLoop2:
 
     ; ************************************************************
     ; Verify the "magic word" that says this is an Interis64 disk
-    ; It should be $BB66 as the last two bytes of the first sector
-    ; This is a cheeky homage to IBM's $AA55
+    ; It should be $BB $66 as the last two bytes of the first sector
+    ; This is a possibly-cheeky homage to IBM's $AA55
     ; ************************************************************
     LD      A, (BootCodeAddress + $01FE)
     CP      $BB
