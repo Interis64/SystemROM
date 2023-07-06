@@ -14,9 +14,9 @@ PS2Keyboard:    PROC
 
 Port:           EQU SLOT1                   ; Port number for the PS2 device
 
-ScanCode:       EQU $8150
-Flags:          EQU ScanCode + 1 
-RelNotifier:    EQU Flags + 1
+ScanCode:       DS  1
+Flags:          DS  1
+RelNotifier:    DS  1
 
 Flag_Shift:     EQU 0
 Flag_Ctrl:      EQU 1

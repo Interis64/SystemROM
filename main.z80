@@ -25,7 +25,7 @@ NMIH:           DS $9A                      ; Region for the non-maskable interr
     ENDS
 
     SECTION RST10
-    JP      Syscall
+    JP      SyscallExec
     ENDS
 
 ROMBoot:
@@ -34,7 +34,7 @@ ROMBoot:
     LD      SP, HL                          ; Set the stack pointer
 
     ; Copy system template to top of RAM
-    LD      BC, $10000 - SysTemplateStart   ; Get the system size
+    LD      BC, $10000 - SystemRAMBase      ; Get the system size
     LD      DE, SystemRAMBase               ; Set the system destination address
     LD      HL, SysTemplateStart            ; Point HL
     LDI                                     ; Copy everything

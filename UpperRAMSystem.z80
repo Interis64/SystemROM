@@ -51,23 +51,51 @@ ColdBoot:
     
     ; Continue with warm boot
 WarmBoot:
+    CALL    BufferedInput.Initialize
+    CALL    PS2Keyboard.Initialize
+    CALL    Serial.Initialize
+
     ; Clear screen
+    LD      A, Syscall.PrintChar
+    LD      (SyscallTarget), A
+    LD      A, ASCII.FF
+    RST     $10
+
     ; Print welcome messages
+    LD      A, Syscall.PrintString
+    LD      (SyscallTarget), A
+    LD      HL, StartupMessage
+    RST     $10
+
     ; Attempt to boot from storage driver
     ; If not, fall back to the monitor
     JP      Monitor.Start
 
-Syscall:
-    PUSH    AF
-    LD      A, (SyscallTarget)
-    LD      IY, SyscallTable
-    ADD     A, IYL
-    LD      IYL, A
-    POP     AF
-    JP      (IY)
+SyscallExec:
+    PUSH    AF                              ; Preserve AF
+    LD      A, (SyscallTarget)              ; Get the syscall number
+    LD      (SyscallJump + 1), A            ; Write the jump address low byte
+    POP     AF                              ; Restore AF
+SyscallJump:
+    JP      $FF00                           ; This jump address is overwritten by the preceding code
 
 NullInterruptHandler:
     RETI
+
+StartupMessage:
+    DB ASCII.FF
+    DB "               Interis 64"
+    DB ASCII.CR, ASCII.LF
+    DB "            System ROM v1.0"
+    DB ASCII.CR, ASCII.LF
+    DB ASCII.CR, ASCII.LF
+    DB "    (C) 2023 M. Martin - GNU GPL 3.0"
+    DB ASCII.CR, ASCII.LF
+    DB ASCII.CR, ASCII.LF
+    DB "      https://github.com/Interis64"
+    DB ASCII.CR, ASCII.LF
+    DB $00
+
 
     INCLUDE "Monitor.z80"
     INCLUDE "BufferedInput.z80"

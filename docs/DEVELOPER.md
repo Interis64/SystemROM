@@ -22,6 +22,8 @@ The information in this document will be invaluable to developers writing softwa
 
 ## System Calls
 
+To make a system call, load the system call number into memory at $FF80 and issue a `RST $10` instruction. See the documentation for each call for information on passing parameters and results.
+
 | Call Number | Function                                                |
 | ----------- | ------------------------------------------------------- |
 |         $00 | Cold Boot                                               |
@@ -35,3 +37,4 @@ The information in this document will be invaluable to developers writing softwa
 |         $10 | System Bell                                             |
 |         $12 | NVRAM Read Byte                                         |
 |         $14 | NVRAM Write Byte                                        |
+|         $16 | Serial Send Byte                                        |

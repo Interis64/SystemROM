@@ -1,6 +1,3 @@
-    
-    ; SECTION SyscallTable
-
     DW  ColdBoot                            ; $00 - Cold Boot
     DW  WarmBoot                            ; $02 - Warm Boot
     DW  Monitor.DebugHandler                ; $04 - Start Debug Monitor
@@ -12,5 +9,19 @@
     DW  NVRAM.Beep                          ; $10 - System Bell
     DW  NVRAM.Read                          ; $12 - NVRAM Read Byte
     DW  NVRAM.Write                         ; $14 - NVRAM Write Byte
+    DW  Serial.TXA                          ; $16 - Serial Transmit Byte
 
-    ; ENDS
+Syscall: PROC
+ColdBoot:       EQU $00
+WarmBoot:       EQU $02
+MonDebug:       EQU $04
+PrintChar:      EQU $06
+PrintString:    EQU $08
+ReadChar:       EQU $0A
+InputReady:     EQU $0C
+InputAccept:    EQU $0E
+Beep:           EQU $10
+NVRAMRead:      EQU $12
+NVRAMWrite:     EQU $14
+SerialTX:       EQU $16
+    ENDP
