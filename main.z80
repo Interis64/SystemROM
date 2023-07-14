@@ -37,12 +37,12 @@ ROMBoot:
     LD      BC, $10000 - SystemRAMBase      ; Get the system size
     LD      DE, SystemRAMBase               ; Set the system destination address
     LD      HL, SysTemplateStart            ; Point HL
-    LDI                                     ; Copy everything
+    LDIR                                    ; Copy everything
 
     ; Copy root template to temp space at $8000
     LD      BC, $0100
-    LD      HL, $8000
-    LD      DE, $0000
+    LD      HL, $0000
+    LD      DE, $8000
     LDIR
 
     ; Find and initialize hardware
