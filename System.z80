@@ -49,11 +49,10 @@ ColdBoot:
     LD      DE, $0000
     LDIR
     
-    CALL    PS2Keyboard.Initialize
-    CALL    Serial.Initialize
-    
     ; Continue with warm boot
 WarmBoot:
+    CALL    PS2Keyboard.Initialize
+    CALL    Serial.Initialize
     CALL    BufferedInput.Initialize
 
     ; Clear screen
@@ -105,4 +104,5 @@ StartupMessage:
     INCLUDE "Serial.z80"
     INCLUDE "Utils.z80"
     INCLUDE "PS2Keyboard.z80"
+    
     ENDS
