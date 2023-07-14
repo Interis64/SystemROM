@@ -33,8 +33,8 @@ To make a system call, load the system call number into memory at $FF80 and issu
 
 | Call Number | Function                                                |
 | ----------- | ------------------------------------------------------- |
-|         $00 | Cold Boot                                               |
-|         $02 | Warm Boot                                               |
+|         $00 | Reboot                                                  |
+|         $02 | (Unused)                                                |
 |         $04 | Start Debug Monitor                                     |
 |         $06 | Print character to output device                        |
 |         $08 | Print null-terminated string to output device           |
@@ -46,10 +46,7 @@ To make a system call, load the system call number into memory at $FF80 and issu
 |         $14 | NVRAM Write Byte                                        |
 |         $16 | Serial Send Byte                                        |
 
-### $00 Cold Boot
-Reloads the base 0x100 bytes of memory, initializes built-in hardware, and continues via the warm boot process.
-
-### $02 Warm Boot
+### $00 Reboot
 Clears the input buffer, clears the screen, displays the ROM header message, attempts to boot from a storage device, falls back to the system monitor if that fails.
 
 ### $04 Start Debug
