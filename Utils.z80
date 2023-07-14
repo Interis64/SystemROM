@@ -31,17 +31,6 @@ PrintCRLF:
     RST     $10
     RET
     
-; Busy-wait for (DE * 17.4)µs
-Delay:
-    LD      A, 7                            ;  7 T
-DelayLoop:
-    DEC     A                               ;  4 T
-    JP      NZ, DelayLoop                   ; 10 T
-    DEC     DE                              ;  6 T
-    LD      A, D                            ;  4 T
-    OR      E                               ;  4 T
-    JP      NZ, Delay                       ; 10 T
-    RET
 
 ; ------------------------------------------------------------------------------
     ENDP
