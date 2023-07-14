@@ -1,5 +1,5 @@
-    DW  ColdBoot                            ; $00 - Cold Boot
-    DW  WarmBoot                            ; $02 - Warm Boot
+    DW  WarmBoot                            ; $00 - Reboot
+    DW  $0000                               ; $02 - (Nothing)
     DW  Monitor.DebugHandler                ; $04 - Start Debug Monitor
     DW  Serial.TXA                          ; $06 - Print character to output device
     DW  Utils.PrintString                   ; $08 - Print null-terminated string to output device
@@ -12,8 +12,7 @@
     DW  Serial.TXA                          ; $16 - Serial Transmit Byte
 
 Syscall: PROC
-ColdBoot:       EQU $00
-WarmBoot:       EQU $02
+Reboot:         EQU $00
 MonDebug:       EQU $04
 PrintChar:      EQU $06
 PrintString:    EQU $08
