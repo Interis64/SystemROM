@@ -15,12 +15,11 @@
 ; 135 TPI, 80 tracks, 18 sectors per track
 ; 300 RPM, 500 kbps
 ; ------------------------------------------------------------------------------
-    ORG $E8f00                               ; Data Storage drivers get loaded to RAM at $EC00
+    ORG $E800                               ; Data Storage drivers get loaded to RAM at $E800
 
 SLOT:               DS  1 ; EQU SLOT5
-
 PORT_MSR:           DS  1 ; EQU SLOT + $10
-PORT_TC:            DS  1 ; SLOT + $05
+PORT_TC:            DS  1 ; EQU SLOT + $05
 PORT_LDCR:          DS  1 ; EQU SLOT + $09              
 PORT_CS:            DS  1 ; EQU SLOT + $11
 PORT_LDOR:          DS  1 ; EQU SLOT + $19
@@ -66,7 +65,7 @@ ResetFDC:
     OUT     (PORT_LDCR), A
 
 	LD	    DE, 144			                ; DELAY: 17.4µs * 144 = 2.5ms
-	CALL	Utils.Delay
+	CALL	Delay
 
 ResetWait:
     ; Wait for drives to be ready
@@ -79,6 +78,18 @@ ResetWait:
     CALL    ReadDataRegister
     JP      ResetWait
 ResetWaitDone:
+    RET
+
+; Busy-wait for (DE * 17.4)µs
+Delay:
+    LD      A, 7                            ;  7 T
+DelayLoop:
+    DEC     A                               ;  4 T
+    JP      NZ, DelayLoop                   ; 10 T
+    DEC     DE                              ;  6 T
+    LD      A, D                            ;  4 T
+    OR      E                               ;  4 T
+    JP      NZ, Delay                       ; 10 T
     RET
 
 ; -------------------------------------
