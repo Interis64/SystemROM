@@ -17,7 +17,7 @@
 ; ------------------------------------------------------------------------------
 FDC:         PROC
 
-InitInstalled:      EQU $8000
+InitInstalled:      EQU $8000               ; temporary "installed" flag for init use only
 
 Initialize:
 

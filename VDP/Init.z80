@@ -16,9 +16,9 @@
 VDP:    PROC
 
 ; Temporary variables
-InitInstalled:      EQU $8000
-InitControlPort:    EQU $8001
-InitDataPort:       EQU $8002
+InitInstalled:      EQU ScratchPad
+InitControlPort:    EQU ScratchPad+1
+InitDataPort:       EQU ScratchPad+2
 
 Initialize:
     ; Clear the installed flag (this will be set based on tests later in the init routine)
