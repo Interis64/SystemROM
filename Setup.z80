@@ -12,10 +12,12 @@
 Setup: PROC
 ; ------------------------------------------------------------------------------
 
+BGColorNVRAM:   EQU     $20
+FGColorNVRAM:   EQU     $21
+
     SECTION SYSRAM
 StringBuffer:       DS VIRTUAL 16               ; 16 bytes
 StringBufferLength: DS VIRTUAL 1
-
     ENDS
 
 

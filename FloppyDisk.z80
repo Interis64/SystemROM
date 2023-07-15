@@ -17,7 +17,7 @@
 ; ------------------------------------------------------------------------------
 FloppyDisk:         PROC
 
-SLOT:               EQU SLOT5
+SLOT:               EQU SLOT7
 
 PORT_MSR:           EQU SLOT + $10
 PORT_TC:            EQU SLOT + $05

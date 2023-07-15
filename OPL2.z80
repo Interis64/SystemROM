@@ -12,6 +12,8 @@
 OPL2: PROC
 ; ------------------------------------------------------------------------------
 
+IOBASE:           EQU $C0
+
 Installed:      EQU $8300
 AddressPort:    EQU $8301
 DataPort:       EQU $8302
@@ -38,12 +40,7 @@ Initialize: ; Initialize the OPL2
     LD      A, $00
     LD      (Installed), A
 
-    ; Set up control port location from NVRAM config
-    ; Set up data port location from NVRAM config
-    LD      A, NVRAM.OPL2_SLOT
-    CALL    NVRAM.GetIOPort
-    CP      $FF                             ; Check if the port is $FF (not installed)
-    RET     Z                               ; Bail out if card is not installed
+    LD      A, IOBASE
     LD      (AddressPort), A                ; Store base address as data port
     INC     A
     LD      (DataPort), A                   ; Store base address + 1 as control port

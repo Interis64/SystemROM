@@ -99,7 +99,6 @@ InterruptTableTarget: DS VIRTUAL 16
     LD      HL, InterruptTableTarget
     LD      A, H                            ; Point to the interrupt table
     LD      I, A
-    EI                                      ; Enable interrupts
 
     CALL    Utils.Initialize
     CALL    NVRAM.Initialize
@@ -107,8 +106,8 @@ InterruptTableTarget: DS VIRTUAL 16
     CALL    PS2Keyboard.Initialize
     CALL    Serial.Initialize
 
-    CALL  	NVRAM.ValidateChecksum          ; Check the NVRAM and if it's bad, skip optional hardware
-    JP    	NZ, SkipOptionalHardware        ; We'll force setup when the machine boots
+;    CALL  	NVRAM.ValidateChecksum          ; Check the NVRAM and if it's bad, skip optional hardware
+;    JP    	NZ, SkipOptionalHardware        ; We'll force setup when the machine boots
 
     CALL    TMS9918A.Initialize
     CALL    OPL2.Initialize
@@ -117,6 +116,7 @@ InterruptTableTarget: DS VIRTUAL 16
 SkipOptionalHardware:
 
     CALL    Utils.Beep
+    EI                                      ; Enable interrupts
 
     ; Show the startup banner
     LD      HL, StartupMessage
