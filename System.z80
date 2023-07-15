@@ -6,14 +6,12 @@
 ; ------------------------------------------------------------------------------
     ORG SystemRAMBase
 
-SysTemplateStart:
-
 VideoDriver:
-    DS  $400
+    DS  VIRTUAL $400
 SoundDriver:
-    DS  $400
+    DS  VIRTUAL $400
 StorageDriver:
-    DS  $400
+    DS  VIRTUAL $400
 System:
     DS  $B00
 SyscallTable:
@@ -40,7 +38,7 @@ InterruptTable:                             ; Interrupt Mode 2 vector table
     SECTION System
 ColdBoot:
     ; Turn on 64K mode
-    LD      A, 1
+    LD      A, $01
     OUT     (0), A
 
     ; Copy the base RAM template over

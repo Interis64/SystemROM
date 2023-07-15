@@ -11,6 +11,8 @@
 ; ------------------------------------------------------------------------------
     ORG $F000                               ; Video drivers get loaded to RAM at $F400
 
+VDPDriver: PROC
+DriverStart:
 TextScreenEnd:      EQU $17C0               ; VRAM Address one past the last char of the screen
 CursorBlinkTime:    EQU 30                  ; Cursor blink time (number of frames)
 
@@ -392,3 +394,5 @@ CheckScreenScroll:
     RET
 
 ; ------------------------------------------------------------------------------
+DriverEnd:
+    ENDP

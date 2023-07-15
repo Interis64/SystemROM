@@ -17,6 +17,8 @@
 ; ------------------------------------------------------------------------------
     ORG $E800                               ; Data Storage drivers get loaded to RAM at $E800
 
+FDCDriver:  PROC
+DriverStart:
 SLOT:               DS  1 ; EQU SLOT5
 PORT_MSR:           DS  1 ; EQU SLOT + $10
 PORT_TC:            DS  1 ; EQU SLOT + $05
@@ -377,3 +379,5 @@ Boot:
     JP      BootCodeAddress     ; Otherwise, we got a good read, so jump to the boot sector code in RAM
 
 ; ------------------------------------------------------------------------------
+DriverEnd:
+    ENDP

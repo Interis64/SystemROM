@@ -17,8 +17,8 @@ VDP:    PROC
 
 ; Temporary variables
 InitInstalled:      EQU ScratchPad
-InitControlPort:    EQU ScratchPad+1
-InitDataPort:       EQU ScratchPad+2
+InitControlPort:    EQU ScratchPad + 1
+InitDataPort:       EQU ScratchPad + 2
 
 Initialize:
     ; Clear the installed flag (this will be set based on tests later in the init routine)
@@ -30,30 +30,30 @@ Initialize:
     CP      $00                             ; Check if the card is not installed
     RET     Z                               ; Bail out if card is not installed
 
-    LD      BC, DriverEnd - DriverStart     ; Get the driver size
+    LD      BC, VDPDriver.DriverEnd - VDPDriver.DriverStart     ; Get the driver size
     LD      DE, $F400                       ; Set the driver destination address
-    LD      HL, DriverStart                 ; Set the driver source address
+    LD      HL, VDPDriver.DriverStart                 ; Set the driver source address
     LDIR
 
     ; Install system call overrides
-    LD      HL, PrintChar
+    LD      HL, VDPDriver.PrintChar
     LD      (SyscallTable + $06), HL        ; Override PrintChar
 
     ; TODO: Set the hardware ID byte for the corresponding slot
 
     ; Copy I/O addresses to the driver
     LD      A, (InitControlPort)
-    LD      (ControlPort), A
+    LD      (VDPDriver.ControlPort), A
     LD      A, (InitDataPort)
-    LD      (DataPort), A
+    LD      (VDPDriver.DataPort), A
 
     LD      A, $FF                          ; Set the default cursor character
-    LD      (CursorChar), A
+    LD      (VDPDriver.CursorChar), A
     
     LD      A, 1                            ; Enable blinking cursor
-    LD      (CursorBlinkEnabled), A
+    LD      (VDPDriver.CursorBlinkEnabled), A
 
-    LD      A, (DataPort)               ; Load the IO address into A
+    LD      A, (VDPDriver.DataPort)               ; Load the IO address into A
     SRL     A                               ; A >> 4 to get IRQ number
     SRL     A
     SRL     A
@@ -62,47 +62,47 @@ Initialize:
     LD      D, 0
     LD      E, A
     ADD     HL, DE                          ; Add enough for this slot
-    LD      DE, IRQHandler
+    LD      DE, VDPDriver.IRQHandler
     LD      (HL), E                         ; Plop our IRQ routine pointer there
     INC     HL
     LD      (HL), D
 
 	LD      B, $00                          ; Register 0
 	LD      A, 00000000b                    ; Disable Mode3, Disable External VDP
-	CALL    WriteRegister
+	CALL    VDPDriver.WriteRegister
 	
 	INC     B                               ; Register 1
 	LD      A, 11010000b                    ; 4116 RAM, No Blanking, Interupt Enabled, Text Mode
-	CALL    WriteRegister
+	CALL    VDPDriver.WriteRegister
 
 	INC     B                               ; Register 2
 	LD      A, $05                          ; Pattern Name Table Base Address 0x1400
-	CALL    WriteRegister
+	CALL    VDPDriver.WriteRegister
 
 	INC     B                               ; Register 3
 	LD      A, $80                          ; Color Table Base Address 0x2000
-	CALL    WriteRegister
+	CALL    VDPDriver.WriteRegister
 
 	INC     B                               ; Register 4
 	LD      A, $01                          ; Pattern Generator Base Address 0x0800
-	CALL    WriteRegister
+	CALL    VDPDriver.WriteRegister
 
 	INC     B                               ; Register 5
 	LD      A, $20                          ; Sprite Attribute Table Base Address 0x1000
-	CALL    WriteRegister
+	CALL    VDPDriver.WriteRegister
 
 	INC     B                               ; Register 6
 	LD      A, $00                          ; Sprite Pattern Generator Base Address 0x0000
-	CALL    WriteRegister
+	CALL    VDPDriver.WriteRegister
 
 ; TODO: Load color config from NVRAM
 
 	INC     B                               ; Register 7
 	LD      A, $1F                          ; Text Color 1 / Text Color 0/Backdrop
-	CALL    WriteRegister
+	CALL    VDPDriver.WriteRegister
 
 
-    LD      A, (ControlPort)
+    LD      A, (VDPDriver.ControlPort)
     LD      C, A
 	LD      A, $00                          ; Set low byte of VRAM address 0x00
 	OUT     (C), A
@@ -111,7 +111,7 @@ Initialize:
 	
 	LD      HL, VDPFont                     ; Load address of font
 	LD      B, $00
-    LD      A, (DataPort)
+    LD      A, (VDPDriver.DataPort)
 	LD      C, A                            ; Write character glyphs to pattern table
 	OTIR
 	OTIR
@@ -226,10 +226,6 @@ InitReadVRAM:
     RET
 
     INCLUDE "Font.z80"
-
-DriverStart:
-    INCLUDE "Driver.z80"
-DriverEnd:
 
     ENDP
     

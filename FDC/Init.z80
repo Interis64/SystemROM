@@ -17,7 +17,7 @@
 ; ------------------------------------------------------------------------------
 FDC:         PROC
 
-InitInstalled:      EQU $8000               ; temporary "installed" flag for init use only
+InitInstalled:      EQU ScratchPad               ; temporary "installed" flag for init use only
 
 Initialize:
 
@@ -30,18 +30,18 @@ Initialize:
     CP      $00                             ; Check if the card is not installed
     RET     Z                               ; Bail out if card is not installed
 
-    LD      BC, DriverEnd - Driver          ; Get the driver size
+    LD      BC, FDCDriver.DriverEnd - FDCDriver.DriverStart          ; Get the driver size
     LD      DE, $F400                       ; Set the driver destination address
-    LD      HL, Driver                      ; Set the driver source address
+    LD      HL, FDCDriver.DriverStart                      ; Set the driver source address
     LDIR
 
-    CALL    ResetFDC
+    CALL    FDCDriver.ResetFDC
     XOR     A
-    LD      (DriveNumber), A
-    CALL    SelectDrive
-    CALL    Specify
-    CALL    Recalibrate
-    CALL    DeselectDrives
+    LD      (FDCDriver.DriveNumber), A
+    CALL    FDCDriver.SelectDrive
+    CALL    FDCDriver.Specify
+    CALL    FDCDriver.Recalibrate
+    CALL    FDCDriver.DeselectDrives
 
     ; TODO: Install syscall routines
     ; TODO: Set the hardware ID byte for the corresponding slot
@@ -50,10 +50,6 @@ Initialize:
 
 LookForCard:
     RET
-
-Driver:
-    INCLUDE "Driver.z80"
-DriverEnd:
 
 ; ------------------------------------------------------------------------------
 	ENDP
