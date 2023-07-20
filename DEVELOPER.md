@@ -25,6 +25,8 @@ The information in this document will be invaluable to developers writing softwa
 | \$EC00-$E999 | Sound Driver: 1KB                 |
 | \$E800-$EB99 | Storage Driver: 1KB               |
 |        $E800 | Starting address of stack pointer |
+| \$0100-$E800 | Application memory                |
+| \$0000-$00FF | Reserved for Z80 reset vectors    |
 
 
 ## System Calls
