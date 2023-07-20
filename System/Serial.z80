@@ -57,6 +57,11 @@ Serial.IRQHandler:
     LD      A, Serial.RTS_HIGH
     OUT     (Serial.CONTROL_PORT), A
     IN      A, (Serial.DATA_PORT)
+    PUSH    AF
+    LD      A, Syscall.SerialRX
+    LD      (SyscallTarget), A
+    POP     AF
+    RST     $10
     CALL    BufferedInput.Accept
 Serial.IRQSkip:
     LD      A, Serial.RTS_LOW

@@ -10,6 +10,7 @@
     DW  NVRAM.Read                          ; $12 - NVRAM Read Byte
     DW  NVRAM.Write                         ; $14 - NVRAM Write Byte
     DW  Serial.TXA                          ; $16 - Serial Transmit Byte
+    DW  BufferedInput.Accept                ; $16 - Serial Receive Byte
 
 Syscall.Exec:           EQU $00
 Syscall.Reboot:         EQU $02
@@ -23,3 +24,4 @@ Syscall.Beep:           EQU $10
 Syscall.NVRAMRead:      EQU $12
 Syscall.NVRAMWrite:     EQU $14
 Syscall.SerialTX:       EQU $16
+Syscall.SerialRX:       EQU $18
