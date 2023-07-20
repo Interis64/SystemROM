@@ -9,7 +9,10 @@
 ; Copyright 2023 Matthew Martin
 ; Licensed under the GNU GPL 3.0. See the LICENSE file for details.
 ; ------------------------------------------------------------------------------
-    ORG $F000                               ; Video drivers get loaded to RAM at $F400
+
+    INCLUDE "../build/System.lbl"
+
+    ORG VideoDriverBase                     ; Video drivers get loaded to RAM at $F400
 
 DriverStart:
 TextScreenEnd:      EQU $17C0               ; VRAM Address one past the last char of the screen

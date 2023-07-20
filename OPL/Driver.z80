@@ -12,6 +12,8 @@
 
     INCLUDE "../build/System.lbl"
 
+    ORG     AudioDriverBase
+
 Installed:      EQU $8300
 AddressPort:    EQU $8301
 DataPort:       EQU $8302
@@ -31,121 +33,6 @@ R_OOF:          EQU $B0                     ; Note ON/OFF / Octave / Frequency (
 R_AMVIBR:       EQU $BD                     ; AM Depth / Vibrato Depth / Rhythm Control
 R_FEEDBK:       EQU $C0                     ; Feedback Strength 
 R_WAVE:         EQU $E0                     ; Waveform Select
-
-; ------------------------------------------------------------------------------
-Initialize: ; Initialize the OPL2
-    ; Clear the installed flag (this will be set based on tests later in the init routine)
-    LD      A, $00
-    LD      (Installed), A
-
-    ; Set up control port location from NVRAM config
-    ; Set up data port location from NVRAM config
-    LD      A, NVRAM.OPL2_SLOT
-    CALL    NVRAM.GetIOPort
-    CP      $FF                             ; Check if the port is $FF (not installed)
-    RET     Z                               ; Bail out if card is not installed
-    LD      (AddressPort), A                ; Store base address as data port
-    INC     A
-    LD      (DataPort), A                   ; Store base address + 1 as control port
-
-    DEC     A                               ; Get back to base address
-    SRA     A                               ; A >> 4 to get IRQ number
-    SRA     A
-    SRA     A
-    SRA     A
-    AND     $0F
-    LD      H, $80                          ; Point HL at the interrupt table
-    LD      L, A                            ; location for this IRQ number
-    LD      (HL), IRQHandler                ; Plop our IRQ routine pointer there
-
-    CALL    ResetAll
-
-    LD      H, R_TEST                       ; Reg $00: Test Information
-    LD      L, 00010000b                    ; Set D5 to 1 to enable OPL2 waves
-    CALL    WriteRegister
-
-    LD      H, R_TIMERC                     ; Reg $04: Timer Control
-    LD      L, 10000000b                    ; Reset both timers
-    CALL    WriteRegister
-
-    LD      H, R_CSMKSP                     ; REG $08: CSM Sel / Key Spl
-    LD      L, 00000000b                    ; CSM Off, (no idea about Key Spl)
-    CALL    WriteRegister
-
-    LD      H, $BD                          ; Reg $BD: AM / Vib / Rhythm
-    LD      L, 00000000b                    ; AM Weak, Vib Weak, Rhythm Off
-    CALL    WriteRegister
-
-; ------------------------------------------------------------------------------
-;                          Detecting a Sound Card
-;
-;   According to the AdLib manual, the 'official' method of checking for a 
-;   sound card is as follows:
-;
-;      1)  Reset both timers by writing 60h to register 4.
-;      2)  Enable the interrupts by writing 80h to register 4.  NOTE: this
-;          must be a separate step from number 1.
-;      3)  Read the status register (port 388h).  Store the result.
-;      4)  Write FFh to register 2 (Timer 1).
-;      5)  Start timer 1 by writing 21h to register 4.
-;      6)  Delay for at least 80 microseconds.
-;      7)  Read the status register (port 388h).  Store the result.
-;      8)  Reset both timers and interrupts (see steps 1 and 2).
-;      9)  Test the stored results of steps 3 and 7 by ANDing them
-;          with E0h.  The result of step 3 should be 00h, and the 
-;          result of step 7 should be C0h.  If both are correct, an
-;          AdLib-compatible board is installed in the computer.
-; ------------------------------------------------------------------------------
-VerifyCardInstalled:
-
-    LD      HL, $0460
-    CALL    WriteRegister
-
-    LD      HL, $0480
-    CALL    WriteRegister
-
-    LD      A, (AddressPort)                ; Read status register
-    LD      C, A
-    IN      A, (C)
-    AND     $E0
-    CP      $00
-    RET     NZ
-
-    LD      HL, $02FF
-    CALL    WriteRegister
-
-    LD      HL, $0421
-    CALL    WriteRegister
-
-    DI                                      ; Disable interrupts so we don't get stuck in here
-
-    ; Delay 80µs
-    LD      B, $10                          ; Run this loop 16 times (811 T-states total, about 110 µs)
-VerifyTimerDelay:
-    EX      (SP), HL                        ; 19 T-states
-    EX      (SP), HL                        ; 19 T-states
-    DJNZ    VerifyTimerDelay                ; 13/8 T-states
-
-    LD      A, (AddressPort)                ; Read status register
-    LD      C, A
-    IN      A, (C)
-
-    LD      HL, $0460
-    CALL    WriteRegister
-
-    LD      HL, $0480
-    CALL    WriteRegister
-
-    EI                                      ; Reenable interrupts
-
-    AND     $E0
-    CP      $C0
-    RET     NZ
-
-    LD      A, $01
-    LD      (Installed), A
-
-    RET
 
 IRQHandler:
     EI

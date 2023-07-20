@@ -15,7 +15,9 @@
 ; 135 TPI, 80 tracks, 18 sectors per track
 ; 300 RPM, 500 kbps
 ; ------------------------------------------------------------------------------
-    ORG $E800                               ; Data Storage drivers get loaded to RAM at $E800
+    INCLUDE "../build/System.lbl"
+    
+    ORG StorageDriverBase                               ; Data Storage drivers get loaded to RAM at $E800
 
 DriverStart:
 SLOT:               DS  1 ; EQU SLOT5
