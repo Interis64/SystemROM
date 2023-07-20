@@ -1,27 +1,38 @@
-    DW  SyscallExec                         ; $00 - Reboot
-    DW  WarmBoot                            ; $02 - (Nothing)
-    DW  Monitor.DebugHandler                ; $04 - Start Debug Monitor
-    DW  Serial.TXA                          ; $06 - Print character to output device
-    DW  Utils.PrintString                   ; $08 - Print null-terminated string to output device
-    DW  BufferedInput.Read                  ; $0A - Read a character from BufferedInput
-    DW  BufferedInput.IsCharAvailable       ; $0C - Check if there's a character available in BufferedInput
-    DW  BufferedInput.Accept                ; $0E - Write a character into the input buffer
-    DW  NVRAM.Beep                          ; $10 - System Bell
-    DW  NVRAM.Read                          ; $12 - NVRAM Read Byte
-    DW  NVRAM.Write                         ; $14 - NVRAM Write Byte
-    DW  Serial.TXA                          ; $16 - Serial Transmit Byte
-    DW  BufferedInput.Accept                ; $16 - Serial Receive Byte
-
 Syscall.Exec:           EQU $00
+    DW  SyscallExec                         ; $00 - Reboot
+
 Syscall.Reboot:         EQU $02
+    DW  WarmBoot                            ; $02 - (Nothing)
+
 Syscall.MonDebug:       EQU $04
+    DW  Monitor.DebugHandler                ; $04 - Start Debug Monitor
+
 Syscall.PrintChar:      EQU $06
+    DW  Serial.TXA                          ; $06 - Print character to output device
+
 Syscall.PrintString:    EQU $08
+    DW  Utils.PrintString                   ; $08 - Print null-terminated string to output device
+
 Syscall.ReadChar:       EQU $0A
+    DW  BufferedInput.Read                  ; $0A - Read a character from BufferedInput
+
 Syscall.InputReady:     EQU $0C
+    DW  BufferedInput.IsCharAvailable       ; $0C - Check if there's a character available in BufferedInput
+
 Syscall.InputAccept:    EQU $0E
+    DW  BufferedInput.Accept                ; $0E - Write a character into the input buffer
+
 Syscall.Beep:           EQU $10
+    DW  NVRAM.Beep                          ; $10 - System Bell
+
 Syscall.NVRAMRead:      EQU $12
+    DW  NVRAM.Read                          ; $12 - NVRAM Read Byte
+
 Syscall.NVRAMWrite:     EQU $14
+    DW  NVRAM.Write                         ; $14 - NVRAM Write Byte
+
 Syscall.SerialTX:       EQU $16
+    DW  Serial.TXA                          ; $16 - Serial Transmit Byte
+
 Syscall.SerialRX:       EQU $18
+    DW  BufferedInput.Accept                ; $16 - Serial Receive Byte
