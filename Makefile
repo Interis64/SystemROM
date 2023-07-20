@@ -1,5 +1,5 @@
 all: main.z80 build/System.bin build/VDPDriver.bin build/OPLDriver.bin build/FDCDriver.bin dist
-	z80asm -o dist/InterisROM.bin main.z80
+	z80asm -Ibuild -o dist/InterisROM.bin main.z80
 
 build/System.bin: System/*.z80 build
 	z80asm -ISystem -Lbuild/System.lbl -o $@ System/System.z80

@@ -1,4 +1,4 @@
-    INCLUDE "build/System.lbl"
+    INCLUDE "System.lbl"
 
     SEEK    $0000
     ORG     $0000
@@ -40,20 +40,20 @@ ROMBoot:
     INCLUDE "FDC/Init.z80"
 
 VDPDriverStart:
-    INCLUDE "build/VDPDriver.lbl"
-    INCBIN  "build/VDPDriver.bin"
+    INCLUDE "VDPDriver.lbl"
+    INCBIN  "VDPDriver.bin"
 VDPDriverEnd:
 
 OPLDriverStart:
-    INCLUDE "build/OPLDriver.lbl"
-    INCBIN  "build/OPLDriver.bin"
+    INCLUDE "OPLDriver.lbl"
+    INCBIN  "OPLDriver.bin"
 OPLDriverEnd:
 
 FDCDriverStart:
-    INCLUDE "build/FDCDriver.lbl"
-    INCBIN  "build/FDCDriver.bin"
+    INCLUDE "FDCDriver.lbl"
+    INCBIN  "FDCDriver.bin"
 FDCDriverEnd:
 
 SysTemplateStart:
-    INCBIN "build/System.bin"
+    INCBIN "System.bin"
 SysTemplateEnd:
