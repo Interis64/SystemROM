@@ -12,6 +12,7 @@ The information in this document will be invaluable to developers writing softwa
 |        $FFFC | SLOT 5 Hardware ID                |
 |        $FFFB | SLOT 4 Hardware ID                |
 | \$FF80-$FFEF | System call vector table          |
+| \$FF10-$FF7F | System scratchpad memory          |
 |        $FF0E | Interrupt 7 Vector                |
 |        $FF0C | Interrupt 6 Vector                |
 |        $FF0A | Interrupt 5 Vector                |
