@@ -50,10 +50,10 @@ See the documentation for each syscall below for information on passing paramete
 |         $14 | NVRAM Write Byte                                        |
 |         $16 | Serial Send Byte                                        |
 
-### $02 Reset
+### $02 – Reset
 Clears the input buffer, clears the screen, displays the ROM header message, attempts to boot from a storage device, falls back to the system monitor if that fails.
 
-### $04 Start Debug
+### $04 – Start Debug
 Breaks out of the current program to the system monitor for debugging.
 
 ### $06 Print character to output device
