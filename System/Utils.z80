@@ -9,10 +9,7 @@
 ; Copyright 2023 Matthew Martin
 ; Licensed under the GNU GPL 3.0. See the LICENSE file for details.
 ; ------------------------------------------------------------------------------
-Utils: PROC
-; ------------------------------------------------------------------------------
-
-PrintString:
+Utils.PrintString:
     LD      A, $06                          ; Set syscall $06
     LD      (SyscallTarget), A
     LD      A, (HL)                         ; Get character
@@ -20,18 +17,15 @@ PrintString:
     RET     Z                               ; If so, then we're at the end and can return
     RST     $10                             ; Print it
     INC     HL                              ; Next Character
-    JR      PrintString                     ; Continue until $00
+    JR      Utils.PrintString                     ; Continue until $00
 
-PrintCRLF:
+Utils.PrintCRLF:
     LD      A, $06                          ; Set syscall $06
     LD      (SyscallTarget), A
-    LD      A, ASCII.CR
+    LD      A, '\r'
     RST     $10
-    LD      A, ASCII.LF
+    LD      A, '\n'
     RST     $10
     RET
     
-
-; ------------------------------------------------------------------------------
-    ENDP
 ; ------------------------------------------------------------------------------

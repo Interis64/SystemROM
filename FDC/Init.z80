@@ -15,24 +15,22 @@
 ; 135 TPI, 80 tracks, 18 sectors per track
 ; 300 RPM, 500 kbps
 ; ------------------------------------------------------------------------------
-FDC:         PROC
 
-InitInstalled:      EQU ScratchPad               ; temporary "installed" flag for init use only
+FDC.InitInstalled:      EQU ScratchPad               ; temporary "installed" flag for init use only
 
-Initialize:
-
+FDC.Initialize:
     ; Clear the installed flag (this will be set based on tests later in the init routine)
     LD      A, $00
-    LD      (InitInstalled), A
+    LD      (FDC.InitInstalled), A
 
-    CALL    LookForCard
-    LD      A, (InitInstalled)
+    CALL    FDC.LookForCard
+    LD      A, (FDC.InitInstalled)
     CP      $00                             ; Check if the card is not installed
     RET     Z                               ; Bail out if card is not installed
 
-    LD      BC, FDCDriver.DriverEnd - FDCDriver.DriverStart          ; Get the driver size
+    LD      BC, FDCDriverEnd - FDCDriverStart          ; Get the driver size
     LD      DE, $F400                       ; Set the driver destination address
-    LD      HL, FDCDriver.DriverStart                      ; Set the driver source address
+    LD      HL, FDCDriverStart                      ; Set the driver source address
     LDIR
 
     CALL    FDCDriver.ResetFDC
@@ -48,9 +46,6 @@ Initialize:
 
     RET
 
-LookForCard:
+FDC.LookForCard:
     RET
 
-; ------------------------------------------------------------------------------
-	ENDP
-; ------------------------------------------------------------------------------

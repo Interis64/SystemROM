@@ -9,8 +9,8 @@
 ; Copyright 2023 Matthew Martin
 ; Licensed under the GNU GPL 3.0. See the LICENSE file for details.
 ; ------------------------------------------------------------------------------
-OPL2: PROC
-; ------------------------------------------------------------------------------
+
+    INCLUDE "../build/System.lbl"
 
 Installed:      EQU $8300
 AddressPort:    EQU $8301
@@ -237,5 +237,3 @@ ResetLoop:
     CP      0
     RET     Z
     JP      ResetLoop
-
-    ENDP

@@ -1,0 +1,526 @@
+; ------------------------------------------------------------------------------
+; Monitor.z80
+; ------------------------------------------------------------------------------
+; System monitor/debugger
+; ------------------------------------------------------------------------------
+; Interis 64 Z80 Computer
+; https://github.com/Interis64
+; 
+; Copyright 2023 Matthew Martin
+; Licensed under the GNU GPL 3.0. See the LICENSE file for details.
+; ------------------------------------------------------------------------------
+; Commands
+; M addr        - Start interactive memory editor at address 'addr'
+; D addr size   - Dump 'size' bytes of raw memory over serial port starting with address 'addr'
+; X addr        - Jump to memory address hhll and execute code
+; Q             - Quit the monitor (resume if we broke in via NMI, reset otherwise)
+; ------------------------------------------------------------------------------
+
+Monitor.CommandBufferMax:       EQU 16                                  ; Max of 16 chars for commands
+Monitor.CommandBufferLength:    DS  1                                   ; Memory location for the current size of the command buffer
+Monitor.CommandBuffer:          DS  Monitor.CommandBufferMax                    ; Memory location for the command buffer (16 bytes)
+Monitor.DataBufferMax:          EQU 23                                  ; Max of 23 chars for data (8 hex bytes with spaces between)
+Monitor.DataBufferLength:       DS  1                                   ; Memory location for the current size of the data buffer
+Monitor.DataStartAddress:       DS  2                                   ; Memory location for the Memory Editor start address
+Monitor.DataBuffer:             DS  Monitor.DataBufferMax                       ; Memory location for the data buffer (23 bytes)
+
+; If we got here from a non-maskable interrupt, then we'll swap out the registers
+; so we don't clobber the running program. When the Monitor exits, we
+; swap them back and give control back.
+Monitor.NMIHandler:
+    EX      AF, AF'
+    EXX
+
+    ; Call instead of jump, so we put this return address on the stack
+    CALL    Monitor.ControlLoop
+    
+    ; When the user quits the monitor, we'll pick up here
+    EXX
+    EX      AF, AF'
+    RETN
+
+; If we got here from an external call, then we'll swap out the registers
+; so we don't clobber the running program. When the Monitor exits, we
+; swap them back and give control back.
+Monitor.DebugHandler:
+    EX      AF, AF'
+    EXX
+
+    ; Call instead of jump, so we put this return address on the stack
+    CALL    Monitor.ControlLoop
+    
+    ; When the user quits the monitor, we'll pick up here
+    EXX
+    EX      AF, AF'
+    RET
+
+Monitor.Start:
+    LD      HL, $0000                       ; Push $0000 to the stack so we do a cold reset on a quit command
+    PUSH    HL
+
+Monitor.ControlLoop:
+    CALL    Monitor.AcceptInput
+    CALL    Monitor.ProcessInput
+    JP      Monitor.ControlLoop
+
+; -------------------------------------
+; Accept Input - Reads up to 16 bytes of ASCII from the user
+; -------------------------------------
+Monitor.AcceptInput:
+    LD      HL, Monitor.CommandPrompt               ; Print our prompt
+    CALL    Utils.PrintString
+    XOR     A                               ; Zero out the length
+    LD      (Monitor.CommandBufferLength), A        
+    LD      HL, Monitor.CommandBuffer               ; Point HL at the command buffer
+Monitor.AcceptInputLoop:
+    CALL    BufferedInput.Read
+
+    CP      '\n'                        ; Ignore LF character
+    JP      Z, Monitor.AcceptInputLoop
+
+    CP      '\r'                        ; CR completes input
+    RET     Z
+
+    CP      $08                        ; Handle Backspace
+    JP      Z, Monitor.AcceptBackspace
+
+    CP      $1B
+    JP      Z, Monitor.AcceptInput                  ; Esc key aborts the current line and prompts again
+
+    LD      B, A
+    LD      A, (Monitor.CommandBufferLength)        ; Check if we're at the max input size
+    CP      Monitor.CommandBufferMax
+    JP      Z, Monitor.AcceptInputLoop              ; If we're at max size, do nothing
+    LD      A, Syscall.PrintChar
+    LD      (SyscallTarget), A
+    LD      A, B
+    RST     $10                 ; Echo back to the screen
+    LD      (HL), A                         ; Stuff in the command buffer
+    INC     HL                              ; Move to the next location
+    LD      A, (Monitor.CommandBufferLength)        ; Increment our length counter
+    INC     A
+    LD      (Monitor.CommandBufferLength), A        
+    JP      Monitor.AcceptInputLoop                 ; Wait for the next input
+
+Monitor.AcceptBackspace:
+    LD      A, (Monitor.CommandBufferLength)        ; Load our length counter
+    CP      $00                             ; If we're at zero length, can't backspace
+    JP      Z, Monitor.AcceptInputLoop              ; So just go back to our input loop
+    LD      A, Syscall.PrintChar
+    LD      (SyscallTarget), A
+    LD      A, $08                     ;
+    RST     $10                             ; Output the backspace char
+    DEC     HL                              ; Go back a spot
+    LD      A, (Monitor.CommandBufferLength)        ; Decrement our length counter
+    DEC     A
+    LD      (Monitor.CommandBufferLength), A
+    JP      Monitor.AcceptInputLoop
+
+; -------------------------------------
+; Process Input - Decides what to do based on the user's input
+; -------------------------------------
+Monitor.ProcessInput:
+    ; LD      A, Syscall.PrintChar
+    ; LD      (SyscallTarget), A
+    ; LD      A, '\n'
+    ; RST     $10
+    ; RST     $10
+    LD      HL, Monitor.CommandBuffer
+    LD      A, (HL)
+    CP      'M'
+    JP      Z, Monitor.ProcessMemoryEditorCommand
+    CP      'm'
+    JP      Z, Monitor.ProcessMemoryEditorCommand
+    CP      'X'
+    JP      Z, Monitor.ProcessExecuteCommand
+    CP      'x'
+    JP      Z, Monitor.ProcessExecuteCommand
+    CP      'D'
+    JP      Z, Monitor.ProcessDumpCommand
+    CP      'd'
+    JP      Z, Monitor.ProcessDumpCommand
+    CP      'Q'
+    JP      Z, Monitor.ProcessQuitCommand
+    CP      'q'
+    JP      Z, Monitor.ProcessQuitCommand
+    ; Unknown, so complain to the user and ask again
+Monitor.CommandError:
+    LD      HL, Monitor.ErrorString
+    JP      Utils.PrintString
+
+; -------------------------------------
+; Memory Editor Command [M addr]
+; -------------------------------------
+Monitor.ProcessMemoryEditorCommand:
+    LD      A, (Monitor.CommandBufferLength)        ; Check command length
+    CP      6                               ; 6 bytes
+    JP      NZ, Monitor.CommandError
+    LD      HL, Monitor.CommandBuffer+2
+    CALL    Monitor.ReadHexWord
+    EX      DE, HL
+    LD      (Monitor.DataStartAddress), HL
+
+    LD      A, Syscall.PrintChar
+    LD      (SyscallTarget), A
+    LD      A, '\n'
+    RST     $10
+    ; Fall through to ME_ControlLoop (Tail Call)
+
+Monitor.ME_ControlLoop:
+    CALL    Monitor.ME_PrintMemory
+    CALL    Monitor.ME_AcceptInput
+    CALL    Monitor.ME_ProcessInput
+    JP      Monitor.ME_ControlLoop
+
+; Prints out 8 bytes of memory from the current address pointer as hex
+Monitor.ME_PrintMemory:
+    LD      A, Syscall.PrintChar
+    LD      (SyscallTarget), A
+    LD      A, '\r'
+    RST     $10
+    LD      A, Syscall.PrintChar
+    LD      (SyscallTarget), A
+    LD      A, '['
+    RST     $10
+    LD      HL, (Monitor.DataStartAddress)          ; Get the address pointer
+    PUSH    HL                              ; Copy to DE
+    POP     DE
+    CALL    Monitor.PrintHexWord                    ; Print address pointer
+    LD      A, Syscall.PrintChar
+    LD      (SyscallTarget), A
+    LD      A, ']'
+    RST     $10
+
+    LD      B, 8
+Monitor.ME_PrintMemoryLoop:
+    LD      A, Syscall.PrintChar
+    LD      (SyscallTarget), A
+    LD      A, ' '
+    RST     $10
+    LD      A, (HL)
+    CALL    Monitor.PrintHexByte
+    INC     HL
+    DJNZ    Monitor.ME_PrintMemoryLoop
+    RET
+
+Monitor.ME_AcceptInput:
+    LD      A, ' '                          ; Clear out the input buffer with blanks
+    LD      HL, Monitor.DataBuffer
+    LD      B, Monitor.DataBufferMax
+Monitor.ME_ClearInputBufferLoop:
+    LD      (HL), A
+    INC     HL
+    DJNZ    Monitor.ME_ClearInputBufferLoop
+    XOR     A                               ; Set the buffer length to zero
+    LD      (Monitor.DataBufferLength), A
+
+    LD      HL, Monitor.DataPrompt                  ; Print our prompt
+    CALL    Utils.PrintString
+    LD      HL, Monitor.DataBuffer                  ; Point HL at the data buffer
+Monitor.ME_AcceptInputLoop:
+    CALL    BufferedInput.Read
+    CP      '\r'                        ; CR completes input
+    RET     Z                               ; So return out of the input loop
+    CP      $08                        ; Ignore LF character
+    JP      Z, Monitor.ME_AcceptInputLoop
+    CP      $08                        ; Handle Backspace
+    JP      Z, Monitor.ME_AcceptBackspace
+    CP      $1B
+    JP      Z, Monitor.ME_AcceptEscape              ; Esc key handler
+
+    LD      B, A                            ; Temporary store of input char
+    LD      A, (Monitor.DataBufferLength)           ; Check if we're at the max input size
+    CP      Monitor.DataBufferMax
+    JP      Z, Monitor.ME_AcceptInputLoop           ; If we're at max size, do nothing
+    LD      A, Syscall.PrintChar
+    LD      (SyscallTarget), A
+    LD      A, B                            ; Restore input char
+    RST     $10                             ; Echo back to the screen
+    LD      (HL), A                         ; Stuff into the data buffer
+    INC     HL                              ; Move to the next location
+    LD      A, (Monitor.DataBufferLength)           ; Increment our length counter
+    INC     A
+    LD      (Monitor.DataBufferLength), A        
+    JP      Monitor.ME_AcceptInputLoop              ; Wait for the next input
+
+Monitor.ME_AcceptEscape:
+    LD      A, (Monitor.DataBufferLength)           ; Load our length counter
+    CP      $00                             ; If we've entered text, clear it and accept input again
+    JP      NZ, Monitor.ME_AcceptInput              
+                                            ; But if it's a blank line, we exit the memory editor
+    POP     HL                              ; Pop off the extra stack pointer
+    RET                                     ; This should return back to the main monitor loop
+
+Monitor.ME_AcceptBackspace:
+    LD      A, (Monitor.DataBufferLength)           ; Load our length counter
+    CP      $00                             ; If we're at zero length, can't backspace
+    JP      Z, Monitor.ME_AcceptInputLoop           ; So just go back to our input loop
+    LD      A, Syscall.PrintChar
+    LD      (SyscallTarget), A
+    LD      A, $08                     ;
+    RST     $10                             ; Output the backspace char
+    DEC     HL                              ; Go back a spot
+    LD      A, (Monitor.DataBufferLength)           ; Decrement our length counter
+    DEC     A
+    LD      (Monitor.DataBufferLength), A
+    JP      Monitor.ME_AcceptInputLoop
+
+; -------------------------------------
+; ME Process Input - Parses/writes any new data bytes and increments the address pointer
+; -------------------------------------
+Monitor.ME_ProcessInput:
+    LD      A, (Monitor.DataBufferLength)           ; If the user entered nothing, then go to the next memory block
+    CP      0
+    JP      Z, Monitor.ME_IncrementAddress
+    LD      HL, Monitor.DataBuffer
+    CALL    Monitor.ME_CheckDataByte
+    CALL    Monitor.ME_CheckDataByte
+    CALL    Monitor.ME_CheckDataByte
+    CALL    Monitor.ME_CheckDataByte
+    CALL    Monitor.ME_CheckDataByte
+    CALL    Monitor.ME_CheckDataByte
+    CALL    Monitor.ME_CheckDataByte
+    CALL    Monitor.ME_CheckDataByte
+
+    LD      HL, Monitor.DataBuffer
+    LD      DE, (Monitor.DataStartAddress)
+    CALL    Monitor.ME_UpdateDataByte
+    CALL    Monitor.ME_UpdateDataByte
+    CALL    Monitor.ME_UpdateDataByte
+    CALL    Monitor.ME_UpdateDataByte
+    CALL    Monitor.ME_UpdateDataByte
+    CALL    Monitor.ME_UpdateDataByte
+    CALL    Monitor.ME_UpdateDataByte
+    CALL    Monitor.ME_UpdateDataByte
+
+    RET
+
+Monitor.ME_IncrementAddress:
+    LD      HL, (Monitor.DataStartAddress)
+    INC     HL
+    INC     HL
+    INC     HL
+    INC     HL
+    INC     HL
+    INC     HL
+    INC     HL
+    INC     HL
+    LD      (Monitor.DataStartAddress), HL
+    RET
+
+Monitor.ME_CheckDataByte:
+    LD      A, (HL)
+    CP      ' '
+    JP      Z, Monitor.ME_CheckDataByteSkip
+    CALL    Monitor.TestHexDigitSpace
+    JP      PO, Monitor.ME_DataError
+    INC     HL
+    LD      A, (HL)
+    CALL    Monitor.TestHexDigitSpace
+    JP      PO, Monitor.ME_DataError
+    INC     HL
+    INC     HL
+    RET
+Monitor.ME_CheckDataByteSkip:
+    INC     HL
+    INC     HL
+    INC     HL
+    RET
+
+Monitor.ME_UpdateDataByte:
+    LD      A, (HL)                         ; If it's a space, we can skip this byte
+    CP      ' '
+    JP      Z, Monitor.ME_UpdateDataByteSkip
+    CALL    Monitor.ReadHexByte
+    LD      (DE), A                         ; Store the new value
+    INC     DE
+    INC     HL                              ; Skip the space after the value
+    RET
+Monitor.ME_UpdateDataByteSkip:
+    INC     DE
+    INC     HL
+    INC     HL
+    INC     HL
+    RET
+
+Monitor.ME_DataError:
+    LD      HL, Monitor.ErrorString
+    CALL    Utils.PrintString
+    POP     HL                              ; Pop off an extra stack frame
+    RET
+
+; -------------------------------------
+; Execute Command [X addr]
+; -------------------------------------
+Monitor.ProcessExecuteCommand:
+    LD      A, (Monitor.CommandBufferLength)        ; Check command length
+    CP      6                               ; 6 bytes
+    JP      NZ, Monitor.CommandError
+    LD      HL, Monitor.CommandBuffer+2
+    CALL    Monitor.ReadHexWord
+    PUSH    DE                              ; Push onto the stack and we'll abuse RET to jump there
+    RET                                     ; This is going to jump to the address we just pushed from DE
+
+; Note that we don't really expect to come back from where we jumped,
+; but a RET from there will send us back into the monitor loop
+
+; -------------------------------------
+; Dump Command [D addr size]
+; -------------------------------------
+Monitor.ProcessDumpCommand:
+    LD      A, (Monitor.CommandBufferLength)        ; Check command length
+    CP      11                              ; 11 bytes
+    JP      NZ, Monitor.CommandError
+    LD      HL, Monitor.CommandBuffer+1
+    LD      A, (HL)
+    CP      $20                             ; Next char needs to be ASCII space
+    JP      Z, Monitor.CommandError
+    INC     HL
+    CALL    Monitor.ReadHexWord                     ; This is the starting address
+    PUSH    DE
+    INC     HL                              ; Skip the space
+    CALL    Monitor.ReadHexWord                     ; This is the byte length
+    LD      B, D                            ; Copy to our counter
+    LD      C, E
+    POP     HL                              ; Get the address into HL
+
+Monitor.DumpLoop:
+    LD      A, Syscall.PrintChar
+    LD      (SyscallTarget), A
+    LD      A, (HL)
+    RST     $10
+    INC     HL
+    DEC     BC
+    LD      A, B
+    OR      C
+    JP      NZ, Monitor.DumpLoop
+
+
+    RET
+
+
+; -------------------------------------
+; Quit command [Q]
+; -------------------------------------
+Monitor.ProcessQuitCommand:
+    LD      A, (Monitor.CommandBufferLength)        ; Check command length
+    CP      1                               ; 1 byte
+    JP      NZ, Monitor.CommandError
+    CALL    Utils.PrintCRLF
+    POP     HL                              ; Pop off our monitor return address
+    RET                                     ; Return to the previous address (outside of Monitor)
+
+; -------------------------------------
+; I/O Out command [O]
+; -------------------------------------
+
+; -------------------------------------
+; I/O In command [I]
+; -------------------------------------
+
+; ------------------------------------------------------------------------------
+; Hexadecimal I/O routines
+; ------------------------------------------------------------------------------
+; Reads a 16-bit hex value from user input into DE
+; (HL should point to the start of the four-character string in the input buffer)
+Monitor.ReadHexWord:
+    CALL    Monitor.ReadHexByte
+    LD      D, A
+    CALL    Monitor.ReadHexByte
+    LD      E, A
+    RET
+
+; Reads an 8-bit hex value from user input into A
+; (HL should point to the start of the two-character string in the input buffer)
+Monitor.ReadHexByte:
+    PUSH    DE
+    LD      A, (HL)
+    CALL    Monitor.ReadHexNibble
+    ADD     A, A
+    ADD     A, A
+    ADD     A, A
+    ADD     A, A
+    LD      D, A
+    INC     HL
+    LD      A, (HL)
+    CALL    Monitor.ReadHexNibble
+    OR      D
+    INC     HL
+    POP     DE
+    RET
+
+Monitor.ReadHexNibble:
+    CP      'a'
+    JR      C, Monitor.ReadHexNibbleUC
+    SUB     $20                             ; Convert Lowercase to Uppercase
+Monitor.ReadHexNibbleUC:
+    SUB     '0'
+    CP      $0A
+    RET     C
+    SUB     'A'-'0'-10
+    RET
+
+; Prints the hex string representing the word value in DE
+Monitor.PrintHexWord:
+    LD      A, D
+    CALL    Monitor.PrintHexByte
+    LD      A, E
+    ; Fall through to PrintHexByte
+
+; Prints the hex string representing the byte value in A
+Monitor.PrintHexByte:
+    PUSH    AF
+    RRA
+    RRA
+    RRA
+    RRA
+    CALL    Monitor.PrintHexNibble
+    POP     AF
+    ; Fall through to PrintHexNibble
+
+; Prints the hex character representing the low nibble of A
+Monitor.PrintHexNibble:
+    PUSH    AF
+    LD      A, Syscall.PrintChar
+    LD      (SyscallTarget), A
+    POP     AF
+    AND     $0F
+    ADD     A, $90
+    DAA
+    ADC     A, $40
+    DAA
+    RST     $10
+    RET
+
+; Tests if A contains a valid hex digit
+; Afterwards, you can do this:
+; 	jp po,not_found
+Monitor.TestHexDigit:
+    PUSH    HL
+    LD      HL, Monitor.HexDigits
+    LD      BC, 22                          ; 22 possible characters
+    CPIR
+    POP     HL
+    RET
+
+; Tests if A contains a valid hex digit or a space
+; Afterwards, you can do this:
+; 	jp po,not_found
+Monitor.TestHexDigitSpace:
+    PUSH    HL
+    PUSH    BC
+    LD      HL, Monitor.HexDigits
+    LD      BC, 23                          ; 23 possible characters
+    CPIR
+    POP     BC
+    POP     HL
+    RET
+
+Monitor.HexDigits:
+    DB      "0123456789ABCDEFabcdef "
+Monitor.CommandPrompt:
+    DB      "\r\n] ", $00
+Monitor.DataPrompt:
+    DB      "\r\n     : ", $00
+Monitor.ErrorString:
+    DB      "\r\n ???", $00

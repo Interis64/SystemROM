@@ -1,0 +1,167 @@
+; ------------------------------------------------------------------------------
+; PS2Keyboard.z80
+; ------------------------------------------------------------------------------
+; PS/2 Keyboard Driver
+; ------------------------------------------------------------------------------
+; Interis 64 Z80 Computer
+; https://github.com/Interis64
+; 
+; Copyright 2023 Matthew Martin
+; Licensed under the GNU GPL 3.0. See the LICENSE file for details.
+; ------------------------------------------------------------------------------
+; PS2Keyboard:    PROC
+; ------------------------------------------------------------------------------
+
+PS2Keyboard.Port:           EQU SLOT1                   ; Port number for the PS2 device
+
+PS2Keyboard.ScanCode:       DS  1
+PS2Keyboard.Flags:          DS  1
+
+PS2Keyboard.Flag_Shift:     EQU 0
+PS2Keyboard.Flag_Ctrl:      EQU 1
+PS2Keyboard.Flag_Alt:       EQU 2
+PS2Keyboard.Flag_Extend:    EQU 3
+PS2Keyboard.Flag_Release:   EQU 4
+PS2Keyboard.Flag_Released:  EQU 5               ; This is for code that wants to know when a key has been released (bit of a hack, admittedly)    
+
+PS2Keyboard.Initialize:
+    XOR     A
+    LD      (PS2Keyboard.ScanCode), A
+    LD      (PS2Keyboard.Flags), A
+    RET
+
+PS2Keyboard.WaitForKeyRelease:
+    LD      A, (PS2Keyboard.Flags)
+    BIT     PS2Keyboard.Flag_Released, A
+    JP      Z, PS2Keyboard.WaitForKeyRelease
+    RES     PS2Keyboard.Flag_Released, A
+    LD      (PS2Keyboard.Flags), A
+    RET
+
+PS2Keyboard.IRQHandler:
+    PUSH    AF
+    PUSH    BC
+    PUSH    HL
+
+    IN      A, (PS2Keyboard.Port)
+
+    CP      $F0                             ; Check for "break" code (key released)
+    JP      Z, PS2Keyboard.KeyReleased
+
+    CP      $12                             ; Test left shift
+    JP      Z, PS2Keyboard.ProcShiftKey
+    CP      $59                             ; Test right shift
+    JP      Z, PS2Keyboard.ProcShiftKey
+
+    CP      $14                             ; Test left control
+    JP      Z, PS2Keyboard.ProcCtrlKey
+
+    CP      $11                             ; Test left alt
+    JP      Z, PS2Keyboard.ProcAltKey
+
+    CP      $84                             ; See if we're past the end of the scan code table
+    JP      NC, PS2Keyboard.IRQExit
+
+    LD      (PS2Keyboard.ScanCode), A
+
+    LD      A, (PS2Keyboard.Flags)
+    BIT     4, A
+    JP      Z, PS2Keyboard.AcceptKey
+    RES     PS2Keyboard.Flag_Release, A                 ; Reset the KeyRelease flag
+    SET     PS2Keyboard.Flag_Released, A                ; Reset the KeyReleased flag
+    LD      (PS2Keyboard.Flags), A
+    JP      PS2Keyboard.IRQExit
+
+PS2Keyboard.AcceptKey:
+    BIT     PS2Keyboard.Flag_Shift, A                   ; Test whether we're in a shift state
+    JP      NZ, PS2Keyboard.LoadShiftedTable
+    LD      HL, ScanCodeTable.Lowercase
+    JP      PS2Keyboard.TranslateScanCode
+PS2Keyboard.LoadShiftedTable:
+    LD      HL, ScanCodeTable.Uppercase
+PS2Keyboard.TranslateScanCode:
+    LD      A, (PS2Keyboard.ScanCode)
+    LD      BC, $0000
+    LD      C, A
+
+    ADD     HL, BC
+    LD      A, (HL)
+    CP      0
+
+    PUSH    AF
+    LD      A, (PS2Keyboard.Flags)
+    BIT     PS2Keyboard.Flag_Ctrl, A
+    JP      Z, PS2Keyboard.SkipCtrl
+    POP     AF
+    RES     6, A
+    RES     5, A
+    PUSH    AF
+PS2Keyboard.SkipCtrl:
+    POP     AF
+    CP      0
+    CALL    NZ, BufferedInput.Accept        ; Accept it if we have a nonzero character
+    ; Continue through to IRQExit
+    CP      '\r'
+    JR      NZ, PS2Keyboard.IRQExit
+    LD      A, '\n'
+    CALL    BufferedInput.Accept
+
+PS2Keyboard.IRQExit:
+    XOR     A
+    LD      (PS2Keyboard.ScanCode), A
+    POP     HL
+    POP     BC
+    POP     AF
+    EI
+    RETI
+
+PS2Keyboard.KeyReleased:
+    LD      A, (PS2Keyboard.Flags)
+    SET     PS2Keyboard.Flag_Release, A                 ; Set the KeyRelease flag
+    LD      (PS2Keyboard.Flags), A
+    JP      PS2Keyboard.IRQExit
+
+PS2Keyboard.ProcShiftKey:
+    LD      A, (PS2Keyboard.Flags)
+    BIT     PS2Keyboard.Flag_Release, A
+    JP      NZ, PS2Keyboard.ProcShiftRelease
+    SET     PS2Keyboard.Flag_Shift, A                   ; Set the Shift flag
+    LD      (PS2Keyboard.Flags), A
+    JP      PS2Keyboard.IRQExit
+PS2Keyboard.ProcShiftRelease:
+    RES     PS2Keyboard.Flag_Shift, A                   ; Clear the KeyRelease and Shift flags
+    RES     PS2Keyboard.Flag_Release, A
+    LD      (PS2Keyboard.Flags), A
+    JP      PS2Keyboard.IRQExit
+
+PS2Keyboard.ProcCtrlKey:
+    LD      A, (PS2Keyboard.Flags)
+    BIT     PS2Keyboard.Flag_Release, A
+    JP      NZ, PS2Keyboard.ProcCtrlRelease
+    SET     PS2Keyboard.Flag_Ctrl, A
+    LD      (PS2Keyboard.Flags), A
+    JP      PS2Keyboard.IRQExit
+PS2Keyboard.ProcCtrlRelease:
+    RES     PS2Keyboard.Flag_Ctrl, A                    ; Clear the KeyRelease and Ctrl flags
+    RES     PS2Keyboard.Flag_Release, A
+    LD      (PS2Keyboard.Flags), A
+    JP      PS2Keyboard.IRQExit
+
+PS2Keyboard.ProcAltKey:
+    LD      A, (PS2Keyboard.Flags)
+    BIT     PS2Keyboard.Flag_Release, A
+    JP      NZ, PS2Keyboard.ProcAltRelease
+    SET     PS2Keyboard.Flag_Alt, A                     ; Set the Alt flag
+    LD      (PS2Keyboard.Flags), A
+    JP      PS2Keyboard.IRQExit
+PS2Keyboard.ProcAltRelease:
+    RES     PS2Keyboard.Flag_Alt, A                     ; Clear the KeyRelease and Ctrl flags
+    RES     PS2Keyboard.Flag_Release, A
+    LD      (PS2Keyboard.Flags), A
+    JP      PS2Keyboard.IRQExit
+
+    INCLUDE "PS2ScanCodeTable.z80"
+
+; ------------------------------------------------------------------------------
+    ; ENDP
+; ------------------------------------------------------------------------------

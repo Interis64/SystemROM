@@ -1,0 +1,86 @@
+; ------------------------------------------------------------------------------
+; BufferedInput.z80
+; ------------------------------------------------------------------------------
+; Code to handle maintaining an input buffer. Interrupt handlers can write to
+; this buffer and then program code can consume character from it.
+; ------------------------------------------------------------------------------
+; Interis 64 Z80 Computer
+; https://github.com/Interis64
+; 
+; Copyright 2023 Matthew Martin
+; Licensed under the GNU GPL 3.0. See the LICENSE file for details.
+; ------------------------------------------------------------------------------
+; BufferedInput:      PROC
+
+BufferedInput.BUFFER_SIZE:      EQU   $3F
+BufferedInput.FULLSIZE:         EQU   BufferedInput.BUFFER_SIZE - $0F
+BufferedInput.EMPTYSIZE:        EQU   $05
+
+BufferedInput.BUFFER:           DS    BufferedInput.BUFFER_SIZE
+BufferedInput.WR_POINTER:       DS    2
+BufferedInput.RD_POINTER:       DS    2
+BufferedInput.BUFFER_USED:      DS    1
+
+BufferedInput.Initialize:
+      ; Set up the input buffer
+      LD    HL, BufferedInput.BUFFER
+      LD    (BufferedInput.WR_POINTER),HL
+      LD    (BufferedInput.RD_POINTER),HL
+      XOR   A                                   ;0 to accumulator
+      LD    (BufferedInput.BUFFER_USED),A
+      RET
+
+; Accepts a byte into the buffer
+BufferedInput.Accept:
+      PUSH  AF
+      LD    A, (BufferedInput.BUFFER_USED)
+      CP    BufferedInput.BUFFER_SIZE                             ; If full then ignore
+      JR    NZ, BufferedInput.notFull
+      POP   AF
+      RET
+BufferedInput.notFull:
+      LD    HL, (BufferedInput.WR_POINTER)
+      INC   HL
+      LD    A, L                                ; Only need to check low byte becasuse buffer<256 bytes
+      CP    (BufferedInput.BUFFER+BufferedInput.BUFFER_SIZE) & $FF
+      JR    NZ, BufferedInput.notWrap
+      LD    HL, BufferedInput.BUFFER
+BufferedInput.notWrap:
+      LD    (BufferedInput.WR_POINTER), HL
+      POP   AF
+      LD    (HL), A
+      PUSH  AF
+      LD    A, (BufferedInput.BUFFER_USED)
+      INC   A
+      LD    (BufferedInput.BUFFER_USED), A
+      CP    BufferedInput.FULLSIZE
+      POP   AF
+      RET
+
+BufferedInput.Read:
+      LD    A, (BufferedInput.BUFFER_USED)
+      CP    $00
+      JR    Z, BufferedInput.Read
+      PUSH  HL
+      LD    HL, (BufferedInput.RD_POINTER)
+      INC   HL
+      LD    A, L                                ; Only need to check low byte becasuse buffer<256 bytes
+      CP    (BufferedInput.BUFFER+BufferedInput.BUFFER_SIZE) & $FF
+      JR    NZ, BufferedInput.notRdWrap
+      LD    HL, BufferedInput.BUFFER
+BufferedInput.notRdWrap:
+      LD    (BufferedInput.RD_POINTER), HL
+      LD    A, (BufferedInput.BUFFER_USED)
+      DEC   A
+      LD    (BufferedInput.BUFFER_USED), A
+      LD    A, (HL)
+      POP   HL
+      RET                                       ; Char ready in A
+
+; ------------------------------------------------------------------------------
+BufferedInput.IsCharAvailable:
+      LD    A, (BufferedInput.BUFFER_USED)
+      CP    $00
+      RET
+
+      ; ENDP

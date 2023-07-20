@@ -17,7 +17,6 @@
 ; ------------------------------------------------------------------------------
     ORG $E800                               ; Data Storage drivers get loaded to RAM at $E800
 
-FDCDriver:  PROC
 DriverStart:
 SLOT:               DS  1 ; EQU SLOT5
 PORT_MSR:           DS  1 ; EQU SLOT + $10
@@ -57,14 +56,18 @@ StatusBytes:        DS  4                   ; Storage for result status bytes (4
 ; ready
 ; -------------------------------------
 ResetFDC:
+    LD      A, (PORT_LDOR)
+    LD      C, A
     LD      A, 00000000b                    ; Soft-reset the FDC
-    OUT     (PORT_LDOR), A
+    OUT     (C), A
 
     LD      A, 00001100b                    ; Puts the FDC into AT/EISA Mode
-    OUT     (PORT_LDOR), A
+    OUT     (C), A
 
+    LD      A, (PORT_LDCR)
+    LD      C, A
     LD      A, $00                          ; Load the control register
-    OUT     (PORT_LDCR), A
+    OUT     (C), A
 
 	LD	    DE, 144			                ; DELAY: 17.4µs * 144 = 2.5ms
 	CALL	Delay
@@ -101,11 +104,15 @@ DelayLoop:
 ; from the data register
 ; -------------------------------------
 ReadDataRegister:
-    IN      A, (PORT_MSR)                   ; Read main status register
+    LD      A, (PORT_MSR)
+    LD      C, A
+    IN      A, (C)                   ; Read main status register
     AND     11000000b
     CP      11000000b
     JP      NZ, ReadDataRegister
-    IN      A, (PORT_CS)
+    LD      A, (PORT_CS)
+    LD      C, A
+    IN      A, (C)
     RET
     
 ; -------------------------------------
@@ -117,29 +124,37 @@ ReadDataRegister:
 WriteDataRegister:
     PUSH    AF
 WriteDataRegisterWaitLoop:
-    IN      A, (PORT_MSR)                   ; Read main status register
+    LD      A, (PORT_MSR)
+    LD      C, A
+    IN      A, (C)                   ; Read main status register
     AND     11000000b
     CP      10000000b
     JP      NZ, WriteDataRegisterWaitLoop
+    LD      A, (PORT_CS)
+    LD      C, A
     POP     AF
-    OUT     (PORT_CS), A
+    OUT     (C), A
     RET
 
 ; -------------------------------------
 ; Select Drive
 ; -------------------------------------
 SelectDrive:
+    LD      A, (PORT_LDOR)
+    LD      C, A
     LD      A, (DriveNumber)
     OR      00010100b
-    OUT     (PORT_LDOR), A
+    OUT     (C), A
     RET
 
 ; -------------------------------------
 ; Deselect Drives
 ; -------------------------------------
 DeselectDrives:
+    LD      A, (PORT_LDOR)
+    LD      C, A
     LD      A, 00001100b
-    OUT     (PORT_LDOR), A
+    OUT     (C), A
     RET
 
 ; -------------------------------------
@@ -281,7 +296,9 @@ ReadSector:
     LD      HL, (DataBuffer)                ; Get the pointer to the data buffer
     LD      DE, $0000                       ; Timeout value
 ReadSectorDataLoop:
-    IN      A, (PORT_MSR)
+    LD      A, (PORT_MSR)
+    LD      C, A
+    IN      A, (C)
     CP      $F0
     JP      Z, ReadDataByte
     CP      $D0
@@ -294,7 +311,9 @@ ReadSectorDataLoop:
     JP      Z, ReadSectorTimeout            ; If so, bail to the timeout routine
     JP      ReadSectorDataLoop
 ReadDataByte:
-    IN      A, (PORT_CS)
+    LD      A, (PORT_CS)
+    LD      C, A
+    IN      A, (C)
     LD      (HL), A
     INC     HL
     JR      ReadSectorDataLoop
@@ -379,5 +398,3 @@ Boot:
     JP      BootCodeAddress     ; Otherwise, we got a good read, so jump to the boot sector code in RAM
 
 ; ------------------------------------------------------------------------------
-DriverEnd:
-    ENDP

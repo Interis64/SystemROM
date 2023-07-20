@@ -10,9 +10,9 @@
 ; Licensed under the GNU GPL 3.0. See the LICENSE file for details.
 ; ------------------------------------------------------------------------------
 
-ScanCodeTable:    PROC
+; ScanCodeTable:    PROC
 
-Lowercase:
+ScanCodeTable.Lowercase:
     DB  $00
     DB  $00         ; 01 (F001) - F9
     DB  $00
@@ -95,7 +95,7 @@ Lowercase:
     DB  $00
     DB  $00
     DB  $00
-    DB  '\''         ; 52 (F052) - '
+    DB  $27         ; 52 (F052) - '
     DB  $00
     DB  '['         ; 54 (F054) - [
     DB  '='         ; 55 (F055) - =
@@ -146,7 +146,7 @@ Lowercase:
     DB  $00
     DB  $00         ; 83 (F083) - F7
 
-Uppercase:
+ScanCodeTable.Uppercase:
     DB  $00
     DB  $00         ; 01 (F001) - F9
     DB  $00
@@ -301,4 +301,4 @@ Uppercase:
     ; DB  $00         ; E07D (E0F07D) - Page Up
     ; DB  $00         ; E11477E1F014E077 (None) - Pause/Break
 
-    ENDP
+    ; ENDP

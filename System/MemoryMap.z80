@@ -1,0 +1,38 @@
+SystemRAMBase:          EQU $E800
+
+StackPointerStart:      EQU SystemRAMBase
+
+DriverSize:             EQU $400
+VideoDriverBase:        EQU SystemRAMBase
+AudioDriverBase:        EQU VideoDriverBase + DriverSize
+StorageDriverBase:      EQU AudioDriverBase + DriverSize
+
+SystemBase:             EQU StorageDriverBase + DriverSize
+
+IRQ0Vector:             EQU $FF00
+IRQ1Vector:             EQU $FF02
+IRQ2Vector:             EQU $FF04
+IRQ3Vector:             EQU $FF06
+IRQ4Vector:             EQU $FF08
+IRQ5Vector:             EQU $FF0A
+IRQ6Vector:             EQU $FF0C
+IRQ7Vector:             EQU $FF0E
+
+ScratchPad:             EQU $FF10
+ScratchPadSize:         EQU $70
+SyscallTable:           EQU $FF80
+SLOT4HardwareID:        EQU $FFFB
+SLOT5HardwareID:        EQU $FFFC
+SLOT6HardwareID:        EQU $FFFD
+SLOT7HardwareID:        EQU $FFFE
+SyscallTarget:          EQU $FFFF
+
+; I/O Addresses for each hardware slot
+SLOT0:                  EQU $00
+SLOT1:                  EQU $20
+SLOT2:                  EQU $40
+SLOT3:                  EQU $60
+SLOT4:                  EQU $80
+SLOT5:                  EQU $A0
+SLOT6:                  EQU $C0
+SLOT7:                  EQU $E0

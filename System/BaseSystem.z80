@@ -1,41 +1,16 @@
 ; ------------------------------------------------------------------------------
-; UpperRAMSystem.z80
+; BaseSystem.z80
 ; ------------------------------------------------------------------------------
-; This is the entirety of the system stuff that gets loaded to the top of RAM
-; at system startup time
+; Interis startup and system call code. This contains the cold boot code and
+; code for the various system calls available via RST $10.
 ; ------------------------------------------------------------------------------
-    ORG SystemRAMBase
+; Interis 64 Z80 Computer
+; https://github.com/Interis64
+; 
+; Copyright 2023 Matthew Martin
+; Licensed under the GNU GPL 3.0. See the LICENSE file for details.
+; ------------------------------------------------------------------------------
 
-VideoDriver:
-    DS  VIRTUAL $400
-SoundDriver:
-    DS  VIRTUAL $400
-StorageDriver:
-    DS  VIRTUAL $400
-System:
-    DS  $B00
-SyscallTable:
-    INCLUDE "SyscallTable.z80"
-    DS  $80 - ($ - SyscallTable)            ; Pad out the table to account for unused calls
-
-SyscallTarget:  DS 1
-ScratchPad:     DS $6B
-HardwareID4:    DS 1
-HardwareID5:    DS 1
-HardwareID6:    DS 1
-HardwareID7:    DS 1
-
-InterruptTable:                             ; Interrupt Mode 2 vector table
-    DW NullInterruptHandler
-    DW PS2Keyboard.IRQHandler
-    DW Serial.IRQHandler
-    DW NullInterruptHandler
-    DW NullInterruptHandler
-    DW NullInterruptHandler
-    DW NullInterruptHandler
-    DW NullInterruptHandler
-
-    SECTION System
 ColdBoot:
     ; Turn on 64K mode
     LD      A, $01
@@ -56,7 +31,7 @@ WarmBoot:
     ; Clear screen
     LD      A, Syscall.PrintChar
     LD      (SyscallTarget), A
-    LD      A, ASCII.FF
+    LD      A, $0C
     RST     $10
 
     ; Print welcome messages
@@ -70,6 +45,7 @@ WarmBoot:
     JP      Monitor.Start
 
 SyscallExec:
+    POP     HL                              ; This was pushed by the RST10 call
     PUSH    AF                              ; Preserve AF
     LD      A, (SyscallTarget)              ; Get the syscall number
     LD      (SyscallJump + 1), A            ; Write the jump address low byte
@@ -78,29 +54,22 @@ SyscallJump:
     JP      $FF00                           ; This jump address is overwritten by the preceding code
 
 NullInterruptHandler:
+    EI
     RETI
 
 StartupMessage:
-    DB ASCII.FF
-    DB "               Interis 64"
-    DB ASCII.CR, ASCII.LF
-    DB "            System ROM v1.0"
-    DB ASCII.CR, ASCII.LF
-    DB ASCII.CR, ASCII.LF
-    DB "    (C) 2023 M. Martin - GNU GPL 3.0"
-    DB ASCII.CR, ASCII.LF
-    DB ASCII.CR, ASCII.LF
-    DB "      https://github.com/Interis64"
-    DB ASCII.CR, ASCII.LF
+    DB $0C                                  ; Form Feed
+    DB "               Interis 64\r\n"
+    DB "            System ROM v1.0\r\n"
+    DB "\r\n"
+    DB "    (C) 2023 M. Martin - GNU GPL 3.0\r\n"
+    DB "\r\n"
+    DB "      https://github.com/Interis64\r\n"
     DB $00
 
-
-    INCLUDE "Monitor.z80"
     INCLUDE "BufferedInput.z80"
-    INCLUDE "NVRAM.z80"
-    INCLUDE "ASCII.z80"
-    INCLUDE "Serial.z80"
-    INCLUDE "Utils.z80"
     INCLUDE "PS2Keyboard.z80"
-    
-    ENDS
+    INCLUDE "Serial.z80"
+    INCLUDE "NVRAM.z80"
+    INCLUDE "Utils.z80"
+    INCLUDE "Monitor.z80"

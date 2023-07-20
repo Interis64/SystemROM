@@ -11,21 +11,9 @@
 ; ------------------------------------------------------------------------------
     ORG $F000                               ; Video drivers get loaded to RAM at $F400
 
-VDPDriver: PROC
 DriverStart:
 TextScreenEnd:      EQU $17C0               ; VRAM Address one past the last char of the screen
 CursorBlinkTime:    EQU 30                  ; Cursor blink time (number of frames)
-
-ControlPort:        DS 1                    ; The IO address for the VDP's control port
-DataPort:           DS 1                    ; The IO address for the VDP's data port
-CursorPosition:     DS 2                    ; The VRAM address of the text cursor
-LinePosition:       DS 1                    ; The cursor position relative to the start of the line
-CursorChar:         DS 1                    ; The font character to display as the text mode cursor
-CursorBlinkEnabled: DS 1                    ; Non-zero if cursor blinking is enabled
-CursorCharBuffer:   DS 1                    ; Space to store the character thet's "under" the cursor (for blinking)
-CursorBlinkTimer:   DS 1                    ; Counter for making the cursor blink
-CursorVisible:      DS 1                    ; Non-zero if the cursor is currently visible
-LineCopyBuffer:     DS 240                  ; Space to copy six lines worth of text (for scrolling)
 
 ClearVRAM:
     PUSH    AF
@@ -218,13 +206,13 @@ WriteRegister:
 
 ; Prints the byte in A as an ASCII character at the cursor position and advances the cursor
 PrintChar:
-    CP      ASCII.FF                        ; Handle Form Feed (clear screen)
+    CP      $0C                        ; Handle Form Feed (clear screen)
     JP      Z, ClearVRAM
-    CP      ASCII.CR                        ; Handle carriage return
+    CP      '\r'                        ; Handle carriage return
     JP      Z, PrintCR
-    CP      ASCII.LF                        ; Handle line feed
+    CP      '\n'                        ; Handle line feed
     JP      Z, PrintLF
-    CP      ASCII.BS
+    CP      $08
     JP      Z, Backspace
     PUSH    BC
     PUSH    DE
@@ -393,6 +381,13 @@ CheckScreenScroll:
     POP     AF
     RET
 
-; ------------------------------------------------------------------------------
-DriverEnd:
-    ENDP
+ControlPort:        DS 1                    ; The IO address for the VDP's control port
+DataPort:           DS 1                    ; The IO address for the VDP's data port
+CursorPosition:     DS 2                    ; The VRAM address of the text cursor
+LinePosition:       DS 1                    ; The cursor position relative to the start of the line
+CursorChar:         DS 1                    ; The font character to display as the text mode cursor
+CursorBlinkEnabled: DS 1                    ; Non-zero if cursor blinking is enabled
+CursorCharBuffer:   DS 1                    ; Space to store the character thet's "under" the cursor (for blinking)
+CursorBlinkTimer:   DS 1                    ; Counter for making the cursor blink
+CursorVisible:      DS 1                    ; Non-zero if the cursor is currently visible
+LineCopyBuffer:     DS 240                  ; Space to copy six lines worth of text (for scrolling)

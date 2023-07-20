@@ -9,63 +9,59 @@
 ; Copyright 2023 Matthew Martin
 ; Licensed under the GNU GPL 3.0. See the LICENSE file for details.
 ; ------------------------------------------------------------------------------
-Serial:           PROC
+Serial.SLOT:             EQU   SLOT2
 
-SLOT:             EQU   SLOT2
+Serial.CONTROL_PORT:     EQU   Serial.SLOT + $00
+Serial.DATA_PORT:        EQU   Serial.SLOT + $01
 
-CONTROL_PORT:     EQU   (SLOT + $00)
-DATA_PORT:        EQU   (SLOT + $01)
+Serial.MASTER_RESET:     EQU   00000011b
+Serial.RTS_LOW:          EQU   10010110b
+Serial.RTS_HIGH:         EQU   11010110b
 
-MASTER_RESET:     EQU   00000011b
-RTS_LOW:          EQU   10010110b
-RTS_HIGH:         EQU   11010110b
-
-Initialize:
+Serial.Initialize:
     ; Send 00000011 to Control Register for Master Reset
     ; Send 00000010 to Control Register for "clock div 64"
     ;   OR 00010100 for "8 bits, 1 stop, no parity"
 
     ; Master Reset
-    LD      A, MASTER_RESET
-    OUT     (CONTROL_PORT), A
+    LD      A, Serial.MASTER_RESET
+    OUT     (Serial.CONTROL_PORT), A
 
     ; Initialize the 6850 chip
-    LD      A, RTS_LOW
-    OUT     (CONTROL_PORT), A
+    LD      A, Serial.RTS_LOW
+    OUT     (Serial.CONTROL_PORT), A
 
     RET
 
 
 ; ------------------------------------------------------------------------------
-TXA:
+Serial.TXA:
     PUSH    AF
-TX_WAIT_LOOP:
-    IN      A, (CONTROL_PORT)       ; Test if send buffer is full
+Serial.TX_WAIT_LOOP:
+    IN      A, (Serial.CONTROL_PORT)       ; Test if send buffer is full
     BIT     1, A
-    JR      Z, TX_WAIT_LOOP         ; If buffer full, keep waiting
+    JR      Z, Serial.TX_WAIT_LOOP         ; If buffer full, keep waiting
     POP     AF
-    OUT     (DATA_PORT), A          ; Write the character
+    OUT     (Serial.DATA_PORT), A          ; Write the character
     RET    
 
 ; ------------------------------------------------------------------------------
-IRQHandler:
+Serial.IRQHandler:
     PUSH    AF
     PUSH    HL
 
-    IN      A, (CONTROL_PORT)
+    IN      A, (Serial.CONTROL_PORT)
     AND     $01                                 ; Check if interupt due to read buffer full
-    JR      Z, IRQSkip                          ; if not, ignore
+    JR      Z, Serial.IRQSkip                          ; if not, ignore
 
-    LD      A, RTS_HIGH
-    OUT     (CONTROL_PORT), A
-    IN      A, (DATA_PORT)
+    LD      A, Serial.RTS_HIGH
+    OUT     (Serial.CONTROL_PORT), A
+    IN      A, (Serial.DATA_PORT)
     CALL    BufferedInput.Accept
-IRQSkip:
-    LD      A, RTS_LOW
-    OUT     (CONTROL_PORT), A
+Serial.IRQSkip:
+    LD      A, Serial.RTS_LOW
+    OUT     (Serial.CONTROL_PORT), A
     POP     HL
     POP     AF
     EI
     RETI
-
-    ENDP

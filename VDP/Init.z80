@@ -13,26 +13,25 @@
 ; Copyright 2023 Matthew Martin
 ; Licensed under the GNU GPL 3.0. See the LICENSE file for details.
 ; ------------------------------------------------------------------------------
-VDP:    PROC
 
 ; Temporary variables
-InitInstalled:      EQU ScratchPad
-InitControlPort:    EQU ScratchPad + 1
-InitDataPort:       EQU ScratchPad + 2
+VDP.InitInstalled:      EQU ScratchPad
+VDP.InitControlPort:    EQU ScratchPad + 1
+VDP.InitDataPort:       EQU ScratchPad + 2
 
-Initialize:
+VDP.Initialize:
     ; Clear the installed flag (this will be set based on tests later in the init routine)
     LD      A, $00
-    LD      (InitInstalled), A
+    LD      (VDP.InitInstalled), A
 
-    CALL    LookForCard
-    LD      A, (InitInstalled)
+    CALL    VDP.LookForCard
+    LD      A, (VDP.InitInstalled)
     CP      $00                             ; Check if the card is not installed
     RET     Z                               ; Bail out if card is not installed
 
-    LD      BC, VDPDriver.DriverEnd - VDPDriver.DriverStart     ; Get the driver size
+    LD      BC, VDPDriverEnd - VDPDriverStart     ; Get the driver size
     LD      DE, $F400                       ; Set the driver destination address
-    LD      HL, VDPDriver.DriverStart                 ; Set the driver source address
+    LD      HL, VDPDriverStart                 ; Set the driver source address
     LDIR
 
     ; Install system call overrides
@@ -42,9 +41,9 @@ Initialize:
     ; TODO: Set the hardware ID byte for the corresponding slot
 
     ; Copy I/O addresses to the driver
-    LD      A, (InitControlPort)
+    LD      A, (VDP.InitControlPort)
     LD      (VDPDriver.ControlPort), A
-    LD      A, (InitDataPort)
+    LD      A, (VDP.InitDataPort)
     LD      (VDPDriver.DataPort), A
 
     LD      A, $FF                          ; Set the default cursor character
@@ -124,63 +123,63 @@ Initialize:
 
     RET
 
-LookForCard:
+VDP.LookForCard:
     LD      A, $80                          ; Start looking at base address 0x80
-LookForCardLoop:
-    LD      (InitDataPort), A                   ; Store base address as data port
+VDP.LookForCardLoop:
+    LD      (VDP.InitDataPort), A                   ; Store base address as data port
     INC     A
-    LD      (InitControlPort), A                ; Store base address + 1 as control port
+    LD      (VDP.InitControlPort), A                ; Store base address + 1 as control port
 
     PUSH    AF
-    CALL    CheckCardExists                 ; Writes and reads back some VRAM to validate the card
-    JP      Z, FoundCard
+    CALL    VDP.CheckCardExists                 ; Writes and reads back some VRAM to validate the card
+    JP      Z, VDP.FoundCard
     POP     AF
 
     CP      $E1
     RET     NC
     ADD     A, $1F
-    JP      LookForCardLoop
+    JP      VDP.LookForCardLoop
 
-FoundCard:
+VDP.FoundCard:
     LD      A, $01
-    LD      (InitInstalled), A
+    LD      (VDP.InitInstalled), A
     POP     AF
     RET
 
 
-CheckCardExists:
+VDP.CheckCardExists:
     LD      DE, $1400
     LD      A, $00
-    CALL    InitWriteVRAM
-    CALL    InitReadVRAM
+    CALL    VDP.InitWriteVRAM
+    CALL    VDP.InitReadVRAM
     CP      $00
     RET     NZ                              ; Values don't match, so bail
 
     LD      DE, $1400
     LD      A, $55
-    CALL    InitWriteVRAM
-    CALL    InitReadVRAM
+    CALL    VDP.InitWriteVRAM
+    CALL    VDP.InitReadVRAM
     CP      $55
     RET     NZ                              ; Values don't match, so bail
 
     LD      DE, $1400
     LD      A, $AA
-    CALL    InitWriteVRAM
-    CALL    InitReadVRAM
+    CALL    VDP.InitWriteVRAM
+    CALL    VDP.InitReadVRAM
     CP      $AA
     RET     NZ                              ; Values don't match, so bail
 
     LD      DE, $1400
     LD      A, $FF
-    CALL    InitWriteVRAM
-    CALL    InitReadVRAM
+    CALL    VDP.InitWriteVRAM
+    CALL    VDP.InitReadVRAM
     CP      $FF
     RET
 
 ; Writes the data in A to VDP register number B
-InitWriteRegister:
+VDP.InitWriteRegister:
     PUSH    AF
-    LD      A, (InitControlPort)
+    LD      A, (VDP.InitControlPort)
     LD      C, A
     POP     AF
     OUT     (C), A
@@ -191,10 +190,10 @@ InitWriteRegister:
     RET
 
 ; Writes A to the VRAM location DE
-InitWriteVRAM:
+VDP.InitWriteVRAM:
     PUSH    BC
     PUSH    AF
-    LD      A, (InitControlPort)
+    LD      A, (VDP.InitControlPort)
     LD      C, A
 	LD      A, E
 	OUT     (C), A
@@ -202,7 +201,7 @@ InitWriteVRAM:
 	AND     00111111b
 	OR      01000000b
 	OUT     (C), A
-    LD      A, (InitDataPort)
+    LD      A, (VDP.InitDataPort)
     LD      C, A
 	POP     AF
 	OUT     (C), A
@@ -210,23 +209,19 @@ InitWriteVRAM:
     RET
 
 ; Reads A from the VRAM location DE
-InitReadVRAM:
+VDP.InitReadVRAM:
     PUSH    BC
-    LD      A, (InitControlPort)
+    LD      A, (VDP.InitControlPort)
     LD      C, A
 	LD      A, E
 	OUT     (C), A
 	LD      A, D
 	AND     00111111b
 	OUT     (C), A
-    LD      A, (InitDataPort)
+    LD      A, (VDP.InitDataPort)
     LD      C, A
 	IN      A, (C)
     POP     BC
     RET
 
-    INCLUDE "Font.z80"
-
-    ENDP
-    
-
+    INCLUDE "VDP/Font.z80"

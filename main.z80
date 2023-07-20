@@ -1,46 +1,27 @@
-SystemRAMBase:  EQU $E800
+    INCLUDE "build/System.lbl"
 
-; I/O Addresses for each hardware slot
-SLOT0:          EQU $00
-SLOT1:          EQU $20
-SLOT2:          EQU $40
-SLOT3:          EQU $60
-SLOT4:          EQU $80
-SLOT5:          EQU $A0
-SLOT6:          EQU $C0
-SLOT7:          EQU $E0
-
-; Standard z80 reset vectors
-RST00:          DS $08                      ; Reset to $00: Hard reset
-RST08:          DS $08
-RST10:          DS $08
-RST18:          DS $08
-RST20:          DS $08
-RST28:          DS $08
-RST30:          DS $08
-MINT:           DS $2E                      ; Maskable interrupt handler
-NMIH:           DS $9A                      ; Non-maskable interrupt handler
-SYSROM:         DS $8000 - $
-
-    SECTION RST00
+    ORG     $00
+    SEEK    $00
+RST00:
     JP      ROMBoot
-    ENDS
 
-    SECTION RST10
-    JP      SyscallExec
-    ENDS
+    SEEK    $10
+RST10:
+    PUSH    HL
+    LD      HL, (SyscallTable)
+    JP      (HL)
 
-    SECTION SYSROM
+    SEEK    $100
 ROMBoot:
     ; Set up the stack pointer
-    LD      HL, SystemRAMBase               ; SP address is at the bottom of the system in RAM
-    LD      SP, HL                          ; Set the stack pointer
+    LD      HL, SystemRAMBase                       ; SP address is at the bottom of the system in RAM
+    LD      SP, HL                                  ; Set the stack pointer
 
     ; Copy system template to top of RAM
-    LD      BC, $10000 - (SystemRAMBase + $0C00)      ; Get the system size
-    LD      DE, SystemRAMBase + $0C00               ; Set the system destination address
-    LD      HL, SysTemplateStart            ; Point HL to the source address
-    LDIR                                    ; Copy everything
+    LD      BC, SysTemplateEnd - SysTemplateStart                 ; Get the system size
+    LD      DE, SystemBase                          ; Set the system destination address
+    LD      HL, SysTemplateStart                    ; Point HL to the source address
+    LDIR                                            ; Copy everything
 
     ; Copy root template to temp space at $8000
     LD      BC, $0100
@@ -50,20 +31,29 @@ ROMBoot:
 
     ; Find and load hardware drivers
     CALL    VDP.Initialize
-;    CALL    OPL.Initialize
+    CALL    OPL.Initialize
     CALL    FDC.Initialize
     JP      ColdBoot
 
     INCLUDE "VDP/Init.z80"
-;    INCLUDE "OPL/Init.z80"
+    INCLUDE "OPL/Init.z80"
     INCLUDE "FDC/Init.z80"
 
+VDPDriverStart:
+    INCLUDE "build/VDPDriver.lbl"
+    INCBIN  "build/VDPDriver.bin"
+VDPDriverEnd:
 
-TempOrg:    EQU $
+OPLDriverStart:
+    INCLUDE "build/OPLDriver.lbl"
+    INCBIN  "build/OPLDriver.bin"
+OPLDriverEnd:
+
+FDCDriverStart:
+    INCLUDE "build/FDCDriver.lbl"
+    INCBIN  "build/FDCDriver.bin"
+FDCDriverEnd:
+
 SysTemplateStart:
-    INCLUDE "System.z80"
-    ORG     TempOrg + ($ - SystemRAMBase)
-    INCLUDE "VDP/Driver.z80"
-;    INCLUDE "OPL/Driver.z80"
-    INCLUDE "FDC/Driver.z80"
-    ENDS
+    INCBIN "build/System.bin"
+SysTemplateEnd:

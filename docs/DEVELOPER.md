@@ -6,20 +6,20 @@ The information in this document will be invaluable to developers writing softwa
 
 | Address      | Function                          |
 | ------------ | --------------------------------- |
-|        $FFFE | Interrupt 7 Vector                |
-|        $FFFC | Interrupt 6 Vector                |
-|        $FFFA | Interrupt 5 Vector                |
-|        $FFF8 | Interrupt 4 Vector                |
-|        $FFF6 | Interrupt 3 Vector (RTC/NVRAM)    |
-|        $FFF4 | Interrupt 2 Vector (Serial Port)  |
-|        $FFF2 | Interrupt 1 Vector (Keyboard)     |
-|        $FFF0 | Interrupt 0 Vector (Unused)       |
-|        $FFEF | SLOT 7 Hardware ID                |
-|        $FFEE | SLOT 6 Hardware ID                |
-|        $FFED | SLOT 5 Hardware ID                |
-|        $FFEC | SLOT 4 Hardware ID                |
-|        $FF80 | System call number                |
-| \$FF00-$FF7F | System call vector table          |
+|        $FFFF | System call number                |
+|        $FFFE | SLOT 7 Hardware ID                |
+|        $FFFD | SLOT 6 Hardware ID                |
+|        $FFFC | SLOT 5 Hardware ID                |
+|        $FFFB | SLOT 4 Hardware ID                |
+| \$FF80-$FFEF | System call vector table          |
+|        $FF0E | Interrupt 7 Vector                |
+|        $FF0C | Interrupt 6 Vector                |
+|        $FF0A | Interrupt 5 Vector                |
+|        $FF08 | Interrupt 4 Vector                |
+|        $FF06 | Interrupt 3 Vector (RTC/NVRAM)    |
+|        $FF04 | Interrupt 2 Vector (Serial Port)  |
+|        $FF02 | Interrupt 1 Vector (Keyboard)     |
+|        $FF00 | Interrupt 0 Vector (Unused)       |
 | \$F400-$FEFF | Code for system calls             |
 | \$F000-$F399 | Video Driver: 1KB                 |
 | \$EC00-$E999 | Sound Driver: 1KB                 |
@@ -33,8 +33,8 @@ To make a system call, load the system call number into memory at $FF80 and issu
 
 | Call Number | Function                                                |
 | ----------- | ------------------------------------------------------- |
-|         $00 | Reboot                                                  |
-|         $02 | (Unused)                                                |
+|         $00 | Reserved                                                |
+|         $00 | Reset                                                   |
 |         $04 | Start Debug Monitor                                     |
 |         $06 | Print character to output device                        |
 |         $08 | Print null-terminated string to output device           |

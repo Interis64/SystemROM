@@ -1,5 +1,5 @@
 ; ------------------------------------------------------------------------------
-; opl2.z80
+; opl.z80
 ; ------------------------------------------------------------------------------
 ; Support for Yamaha YM3812 (OPL-II) FM Synthesis chip.
 ; ------------------------------------------------------------------------------
@@ -9,34 +9,33 @@
 ; Copyright 2023 Matthew Martin
 ; Licensed under the GNU GPL 3.0. See the LICENSE file for details.
 ; ------------------------------------------------------------------------------
-OPL2: PROC
 ; ------------------------------------------------------------------------------
 
-Installed:      EQU $8300
-AddressPort:    EQU $8301
-DataPort:       EQU $8302
+OPL.Installed:      EQU $8300
+OPL.AddressPort:    EQU $8301
+OPL.DataPort:       EQU $8302
 
 ; Register numbers
-R_TEST:         EQU $00                     ; Test Data / OPL2 Waveform Enable (bit5)
-R_TIMER1:       EQU $01                     ; Timer 1
-R_TIMER2:       EQU $02                     ; Timer 2
-R_TIMERC:       EQU $04                     ; Timer Control
-R_CSMKSP:       EQU $08                     ; CSM Speech Synth / Key Split Note
-R_PARAM1:       EQU $20                     ; AM / Vib / EG Type / Key Scale / Multiple 
-R_PARAM2:       EQU $40                     ; Key Scaling Level / Output Level
-R_PARAM3:       EQU $60                     ; Attack Rate / Decay Rate
-R_PARAM4:       EQU $80                     ; Sustain Level / Release Rate
-R_FREQ:         EQU $A0                     ; Frequency (low 8 bits)
-R_OOF:          EQU $B0                     ; Note ON/OFF / Octave / Frequency (high 2 bits)
-R_AMVIBR:       EQU $BD                     ; AM Depth / Vibrato Depth / Rhythm Control
-R_FEEDBK:       EQU $C0                     ; Feedback Strength 
-R_WAVE:         EQU $E0                     ; Waveform Select
+OPL.R_TEST:         EQU $00                     ; Test Data / OPL2 Waveform Enable (bit5)
+OPL.R_TIMER1:       EQU $01                     ; Timer 1
+OPL.R_TIMER2:       EQU $02                     ; Timer 2
+OPL.R_TIMERC:       EQU $04                     ; Timer Control
+OPL.R_CSMKSP:       EQU $08                     ; CSM Speech Synth / Key Split Note
+OPL.R_PARAM1:       EQU $20                     ; AM / Vib / EG Type / Key Scale / Multiple 
+OPL.R_PARAM2:       EQU $40                     ; Key Scaling Level / Output Level
+OPL.R_PARAM3:       EQU $60                     ; Attack Rate / Decay Rate
+OPL.R_PARAM4:       EQU $80                     ; Sustain Level / Release Rate
+OPL.R_FREQ:         EQU $A0                     ; Frequency (low 8 bits)
+OPL.R_OOF:          EQU $B0                     ; Note ON/OFF / Octave / Frequency (high 2 bits)
+OPL.R_AMVIBR:       EQU $BD                     ; AM Depth / Vibrato Depth / Rhythm Control
+OPL.R_FEEDBK:       EQU $C0                     ; Feedback Strength 
+OPL.R_WAVE:         EQU $E0                     ; Waveform Select
 
 ; ------------------------------------------------------------------------------
-Initialize: ; Initialize the OPL2
+OPL.Initialize: ; Initialize the OPL2
     ; Clear the installed flag (this will be set based on tests later in the init routine)
     LD      A, $00
-    LD      (Installed), A
+    LD      (OPL.Installed), A
 
     ; Set up control port location from NVRAM config
     ; Set up data port location from NVRAM config
@@ -44,9 +43,9 @@ Initialize: ; Initialize the OPL2
     CALL    NVRAM.GetIOPort
     CP      $FF                             ; Check if the port is $FF (not installed)
     RET     Z                               ; Bail out if card is not installed
-    LD      (AddressPort), A                ; Store base address as data port
+    LD      (OPL.AddressPort), A                ; Store base address as data port
     INC     A
-    LD      (DataPort), A                   ; Store base address + 1 as control port
+    LD      (OPL.DataPort), A                   ; Store base address + 1 as control port
 
     DEC     A                               ; Get back to base address
     SRA     A                               ; A >> 4 to get IRQ number
@@ -54,27 +53,32 @@ Initialize: ; Initialize the OPL2
     SRA     A
     SRA     A
     AND     $0F
-    LD      H, $80                          ; Point HL at the interrupt table
-    LD      L, A                            ; location for this IRQ number
-    LD      (HL), IRQHandler                ; Plop our IRQ routine pointer there
+    LD      HL, $FFF0                       ; Point HL at the interrupt table
+    LD      D, 0
+    LD      E, A
+    ADD     HL, DE                          ; Add enough for this slot
+    LD      DE, OPL.IRQHandler
+    LD      (HL), E                         ; Plop our IRQ routine pointer there
+    INC     HL
+    LD      (HL), D
 
-    CALL    ResetAll
+    CALL    OPL.ResetAll
 
-    LD      H, R_TEST                       ; Reg $00: Test Information
+    LD      H, OPL.R_TEST                       ; Reg $00: Test Information
     LD      L, 00010000b                    ; Set D5 to 1 to enable OPL2 waves
-    CALL    WriteRegister
+    CALL    OPL.WriteRegister
 
-    LD      H, R_TIMERC                     ; Reg $04: Timer Control
+    LD      H, OPL.R_TIMERC                     ; Reg $04: Timer Control
     LD      L, 10000000b                    ; Reset both timers
-    CALL    WriteRegister
+    CALL    OPL.WriteRegister
 
-    LD      H, R_CSMKSP                     ; REG $08: CSM Sel / Key Spl
+    LD      H, OPL.R_CSMKSP                     ; REG $08: CSM Sel / Key Spl
     LD      L, 00000000b                    ; CSM Off, (no idea about Key Spl)
-    CALL    WriteRegister
+    CALL    OPL.WriteRegister
 
     LD      H, $BD                          ; Reg $BD: AM / Vib / Rhythm
     LD      L, 00000000b                    ; AM Weak, Vib Weak, Rhythm Off
-    CALL    WriteRegister
+    CALL    OPL.WriteRegister
 
 ; ------------------------------------------------------------------------------
 ;                          Detecting a Sound Card
@@ -96,15 +100,15 @@ Initialize: ; Initialize the OPL2
 ;          result of step 7 should be C0h.  If both are correct, an
 ;          AdLib-compatible board is installed in the computer.
 ; ------------------------------------------------------------------------------
-VerifyCardInstalled:
+OPL.VerifyCardInstalled:
 
     LD      HL, $0460
-    CALL    WriteRegister
+    CALL    OPL.WriteRegister
 
     LD      HL, $0480
-    CALL    WriteRegister
+    CALL    OPL.WriteRegister
 
-    LD      A, (AddressPort)                ; Read status register
+    LD      A, (OPL.AddressPort)                ; Read status register
     LD      C, A
     IN      A, (C)
     AND     $E0
@@ -112,29 +116,29 @@ VerifyCardInstalled:
     RET     NZ
 
     LD      HL, $02FF
-    CALL    WriteRegister
+    CALL    OPL.WriteRegister
 
     LD      HL, $0421
-    CALL    WriteRegister
+    CALL    OPL.WriteRegister
 
     DI                                      ; Disable interrupts so we don't get stuck in here
 
     ; Delay 80µs
     LD      B, $10                          ; Run this loop 16 times (811 T-states total, about 110 µs)
-VerifyTimerDelay:
+OPL.VerifyTimerDelay:
     EX      (SP), HL                        ; 19 T-states
     EX      (SP), HL                        ; 19 T-states
-    DJNZ    VerifyTimerDelay                ; 13/8 T-states
+    DJNZ    OPL.VerifyTimerDelay                ; 13/8 T-states
 
-    LD      A, (AddressPort)                ; Read status register
+    LD      A, (OPL.AddressPort)                ; Read status register
     LD      C, A
     IN      A, (C)
 
     LD      HL, $0460
-    CALL    WriteRegister
+    CALL    OPL.WriteRegister
 
     LD      HL, $0480
-    CALL    WriteRegister
+    CALL    OPL.WriteRegister
 
     EI                                      ; Reenable interrupts
 
@@ -143,81 +147,81 @@ VerifyTimerDelay:
     RET     NZ
 
     LD      A, $01
-    LD      (Installed), A
+    LD      (OPL.Installed), A
 
     RET
 
-IRQHandler:
+OPL.IRQHandler:
     EI
     RETI
     
 ; ------------------------------------------------------------------------------
 ; A quick sound test routine to see if things are actually working
 ; ------------------------------------------------------------------------------
-Beep:
+OPL.Beep:
 ; Set the modulator's multiple to 1
     LD      HL, $2001
-    CALL    WriteRegister
+    CALL    OPL.WriteRegister
 
 ; Set the modulator's level to about 40 dB
     LD      HL, $403F
-    CALL    WriteRegister
+    CALL    OPL.WriteRegister
 
 ; Modulator attack:  quick;   decay:   long
     LD      HL, $60F4
-    CALL    WriteRegister
+    CALL    OPL.WriteRegister
 
 ; Modulator sustain: medium;  release: medium
     LD      HL, $807F
-    CALL    WriteRegister
+    CALL    OPL.WriteRegister
 ; Set voice frequency's LSB (it'll be a D#)
     LD      HL, $A098
-    CALL    WriteRegister
+    CALL    OPL.WriteRegister
 
 ; Set the carrier's multiple to 1
     LD      HL, $2301
-    CALL    WriteRegister
+    CALL    OPL.WriteRegister
 
 ; Set the carrier to maximum volume (about 47 dB)
     LD      HL, $4300
-    CALL    WriteRegister
+    CALL    OPL.WriteRegister
 
 ; Carrier attack:  quick;   decay:   long
     LD      HL, $63F0
-    CALL    WriteRegister
+    CALL    OPL.WriteRegister
 
 ; Carrier sustain: medium;  release: medium
     LD      HL, $837F
-    CALL    WriteRegister
+    CALL    OPL.WriteRegister
 
 ; Turn the voice on; set the octave and freq MSB
     LD      HL, $B036
-    CALL    WriteRegister
+    CALL    OPL.WriteRegister
 
 ; Wait.
     LD      B, $00
-WaitLoop:
+OPL.WaitLoop:
     PUSH    BC
     LD      B, $00
     DJNZ    $
     POP     BC
-    DJNZ    WaitLoop
+    DJNZ    OPL.WaitLoop
     
 ; Turn the voice off
     LD      HL, $B011
-    JP    WriteRegister
+    JP    OPL.WriteRegister
 
 ; Accept register address in H, value in L
-WriteRegister:
+OPL.WriteRegister:
     PUSH    AF
     PUSH    BC
-    LD      A, (AddressPort)
+    LD      A, (OPL.AddressPort)
     LD      C, A
     LD      A, H
     OUT     (C), A
     LD      B, $04
     DJNZ    $
-    LD      A, (DataPort)
+    LD      A, (OPL.DataPort)
     LD      C, A
     LD      A, L
     OUT     (C), A
@@ -227,15 +231,13 @@ WriteRegister:
     POP     AF
     RET
 
-ResetAll:
+OPL.ResetAll:
     LD      L, $00
     LD      H, $01
-ResetLoop:
-    CALL    WriteRegister
+OPL.ResetLoop:
+    CALL    OPL.WriteRegister
     INC     H
     LD      A, H
     CP      0
     RET     Z
-    JP      ResetLoop
-
-    ENDP
+    JP      OPL.ResetLoop
