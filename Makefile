@@ -5,20 +5,20 @@ build/System.bin: System/*.z80 build
 	z80asm -ISystem -Lbuild/System.lbl -o $@ System/System.z80
 
 build/VDPDriver.bin: VDP/Driver.z80 build
-	z80asm -IVDP -Lbuild/VDPDriver.lbl -pVDPDriver. -o $@ VDP/Driver.z80
+	z80asm -IVDP -Ibuild -Lbuild/VDPDriver.lbl -pVDPDriver. -o $@ VDP/Driver.z80
 
 build/OPLDriver.bin: OPL/Driver.z80 build/System.bin build
-	z80asm -IOPL -Lbuild/OPLDriver.lbl -pOPLDriver. -o $@ OPL/Driver.z80
+	z80asm -IOPL -Ibuild -Lbuild/OPLDriver.lbl -pOPLDriver. -o $@ OPL/Driver.z80
 
 build/FDCDriver.bin: FDC/Driver.z80 build
-	z80asm -IFDC -Lbuild/FDCDriver.lbl -pFDCDriver. -o $@ FDC/Driver.z80
+	z80asm -IFDC -Ibuild -Lbuild/FDCDriver.lbl -pFDCDriver. -o $@ FDC/Driver.z80
 
 dist:
 	mkdir dist
 build:
 	mkdir build
 
-.PHONY : clean
+.PHONY: clean
 clean:
 	rm -fR build
 	rm -fR dist

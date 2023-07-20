@@ -15,7 +15,7 @@
 ; 135 TPI, 80 tracks, 18 sectors per track
 ; 300 RPM, 500 kbps
 ; ------------------------------------------------------------------------------
-    INCLUDE "../build/System.lbl"
+    INCLUDE "System.lbl"
     
     ORG StorageDriverBase                               ; Data Storage drivers get loaded to RAM at $E800
 
