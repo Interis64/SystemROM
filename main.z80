@@ -23,7 +23,7 @@ ROMBoot:
     LD      HL, SysTemplateStart                    ; Point HL to the source address
     LDIR                                            ; Copy everything
 
-    ; Copy root template to temp space at $8000
+    ; Copy reset vectors to temp space at $8000
     LD      BC, $0100
     LD      HL, $0000
     LD      DE, $8000
