@@ -45,7 +45,6 @@ WarmBoot:
     JP      Monitor.Start
 
 SyscallExec:
-    POP     HL                              ; This was pushed by the RST10 call
     PUSH    AF                              ; Preserve AF
     LD      A, (SyscallTarget)              ; Get the syscall number
     LD      (SyscallJump + 1), A            ; Write the jump address low byte

@@ -14,11 +14,12 @@
 
     INCLUDE "MemoryMap.z80"
 
-    ORG SystemBase
+    ORG     SystemBase
 
     INCLUDE "BaseSystem.z80"
 
     SEEK    IRQ0Vector - SystemBase
+    ORG     IRQ0Vector - SystemBase
     DW      NullInterruptHandler
     DW      NullInterruptHandler
     DW      NullInterruptHandler
@@ -28,8 +29,10 @@
     DW      NullInterruptHandler
     DW      NullInterruptHandler
 
-    SEEK SyscallTable - SystemBase
+    SEEK    SyscallTable - SystemBase
+    ORG     SyscallTable - SystemBase
     INCLUDE "SyscallTable.z80"
 
     SEEK    $FFFF - SystemBase
-    DB $00
+    ORG     $FFFF - SystemBase
+    DB      $00
