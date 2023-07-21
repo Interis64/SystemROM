@@ -30,8 +30,6 @@ build:
 clean:
 	@rm -fR build
 	@rm -fR dist
-	@rm -f *.bin
-	@rm -f *.lbl
 
 .PHONY: burn
 burn:
