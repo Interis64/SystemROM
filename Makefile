@@ -38,7 +38,7 @@ burn:
 #    $2: size limit
 #  If max size is non-zero, use the specified size as a limit
 # Source: https://embeddedartistry.com/blog/2018/07/26/enforcing-binary-size-limits-using-make/
-ENFORCESIZE = @(FILESIZE=`stat -f '%z' $1` ; \
+ENFORCESIZE = @(FILESIZE=`wc -c < $1 | xargs` ; \
 	if [ $2 -gt 0 ]; then \
 		if [ $$FILESIZE -gt $2 ] ; then \
 			>&2 echo "*** ERROR: File $1 exceeds size limit ($$FILESIZE > $2)" ; \
