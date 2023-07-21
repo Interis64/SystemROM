@@ -47,10 +47,11 @@ WarmBoot:
 SyscallExec:
     PUSH    AF                              ; Preserve AF
     LD      A, (SyscallTarget)              ; Get the syscall number
+    ADD     $80                             ; Adjust for jump table offset
     LD      (SyscallJump + 1), A            ; Write the jump address low byte
     POP     AF                              ; Restore AF
 SyscallJump:
-    JP      $FF00                           ; This jump address is overwritten by the preceding code
+    JP      $0000                           ; This jump address is overwritten by the preceding code
 
 NullInterruptHandler:
     EI
