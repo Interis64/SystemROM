@@ -1,28 +1,28 @@
 all: main.z80 build/System.bin build/VDPDriver.bin build/OPLDriver.bin build/FDCDriver.bin
 	@echo "Assembling main.z80"
-	@mkdir -p /dist
+	@mkdir -p ./dist
 	@z80asm -Ibuild -o dist/InterisROM.bin main.z80
 
 build/System.bin: System/*.z80
 	@echo "Assembling System/System.z80"
-	@mkdir -p /build
+	@mkdir -p ./build
 	@z80asm -ISystem -Lbuild/System.lbl -o $@ System/System.z80
 
 build/VDPDriver.bin: VDP/Driver.z80
 	@echo "Assembling VDP/Driver.z80"
-	@mkdir -p /build
+	@mkdir -p ./build
 	@z80asm -IVDP -Ibuild -Lbuild/VDPDriver.lbl -pVDPDriver. -o $@ VDP/Driver.z80
 	$(call ENFORCESIZE,$@,1024)
 
 build/OPLDriver.bin: OPL/Driver.z80 build/System.bin
 	@echo "Assembling OPL/Driver.z80"
-	@mkdir -p /build
+	@mkdir -p ./build
 	@z80asm -IOPL -Ibuild -Lbuild/OPLDriver.lbl -pOPLDriver. -o $@ OPL/Driver.z80
 	$(call ENFORCESIZE,$@,1024)
 
 build/FDCDriver.bin: FDC/Driver.z80
 	@echo "Assembling FDC/Driver.z80"
-	@mkdir -p /build
+	@mkdir -p ./build
 	@z80asm -IFDC -Ibuild -Lbuild/FDCDriver.lbl -pFDCDriver. -o $@ FDC/Driver.z80
 	$(call ENFORCESIZE,$@,1024)
 
