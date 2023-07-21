@@ -33,6 +33,7 @@ clean:
 
 .PHONY: burn
 burn:
+	@echo "Writing to EEPROM: dist/InterisROM.bin"
 	@minipro -p AT28c256 -w dist/InterisROM.bin
 
 # This function is used to check that a file fits within the allocated size
