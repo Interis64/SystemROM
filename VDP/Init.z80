@@ -30,13 +30,13 @@ VDP.Initialize:
     RET     Z                               ; Bail out if card is not installed
 
     LD      BC, VDPDriverEnd - VDPDriverStart     ; Get the driver size
-    LD      DE, $F400                       ; Set the driver destination address
-    LD      HL, VDPDriverStart                 ; Set the driver source address
+    LD      DE, VideoDriverBase             ; Set the driver destination address
+    LD      HL, VDPDriverStart              ; Set the driver source address
     LDIR
 
     ; Install system call overrides
     LD      HL, VDPDriver.PrintChar
-    LD      (SyscallTable + $06), HL        ; Override PrintChar
+    LD      (SyscallTable + Syscall.PrintChar), HL        ; Override PrintChar
 
     ; TODO: Set the hardware ID byte for the corresponding slot
 
@@ -52,12 +52,12 @@ VDP.Initialize:
     LD      A, 1                            ; Enable blinking cursor
     LD      (VDPDriver.CursorBlinkEnabled), A
 
-    LD      A, (VDPDriver.DataPort)               ; Load the IO address into A
+    LD      A, (VDPDriver.DataPort)         ; Load the IO address into A
     SRL     A                               ; A >> 4 to get IRQ number
     SRL     A
     SRL     A
     SRL     A
-    LD      HL, $FFF0                       ; Point HL at the interrupt table
+    LD      HL, IRQ0Vector                  ; Point HL at the interrupt table
     LD      D, 0
     LD      E, A
     ADD     HL, DE                          ; Add enough for this slot
@@ -126,19 +126,19 @@ VDP.Initialize:
 VDP.LookForCard:
     LD      A, $80                          ; Start looking at base address 0x80
 VDP.LookForCardLoop:
-    LD      (VDP.InitDataPort), A                   ; Store base address as data port
+    LD      (VDP.InitDataPort), A           ; Store base address as data port
     INC     A
-    LD      (VDP.InitControlPort), A                ; Store base address + 1 as control port
+    LD      (VDP.InitControlPort), A        ; Store base address + 1 as control port
 
     PUSH    AF
-    CALL    VDP.CheckCardExists                 ; Writes and reads back some VRAM to validate the card
+    CALL    VDP.CheckCardExists             ; Writes and reads back some VRAM to validate the card
     JP      Z, VDP.FoundCard
     POP     AF
 
-    CP      $E1
-    RET     NC
-    ADD     A, $1F
-    JP      VDP.LookForCardLoop
+    CP      $E1                             ; Check if we've looked in all four slots
+    RET     NC                              ; If so, we're done, no card found
+    ADD     A, $1F                          ; If not, move to the next slot...
+    JP      VDP.LookForCardLoop             ; and do the check again
 
 VDP.FoundCard:
     LD      A, $01
