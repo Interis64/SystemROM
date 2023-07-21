@@ -12,6 +12,8 @@
 ; ------------------------------------------------------------------------------
 
 ColdBoot:
+    DI                                      ; Don't interrupt this process
+
     ; Turn on 64K mode
     LD      A, $01
     OUT     (0), A
@@ -22,6 +24,7 @@ ColdBoot:
     LD      DE, $0000
     LDIR
     
+    EI                                      ; Reenable interrupts
     ; Continue with warm boot
 WarmBoot:
     CALL    PS2Keyboard.Initialize

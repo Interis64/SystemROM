@@ -29,6 +29,8 @@ ROMBoot:
     LD      DE, $8000
     LDIR
 
+    EI                                              ; Enable interrupts for hardware detection
+
     ; Find and load hardware drivers
     CALL    VDP.Initialize
     CALL    OPL.Initialize
