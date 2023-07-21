@@ -13,6 +13,7 @@ Licensed under the GNU GPL 3.0. See the LICENSE file for details.
 Building the ROM requires z80asm and GNU Make.
 Simply execute `make` and the ROM image will be assembled to `dist/InterisROM.bin`.
 Execute `make clean` to remove any build output and start from scratch.
+If you have a TL866 programmer and `minipro` installed, you can execute `make burn` to write a 28C256 EEPROM.
 
 ### Code Organization
 The `main.z80` file contains the basic layout of the ROM image, initial startup code, and reset vectors.

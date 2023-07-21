@@ -17,16 +17,20 @@ build/FDCDriver.bin: FDC/Driver.z80 build
 	$(call ENFORCESIZE,$@,1024)
 
 dist:
-	mkdir dist
+	@mkdir dist
 build:
-	mkdir build
+	@mkdir build
 
 .PHONY: clean
 clean:
-	rm -fR build
-	rm -fR dist
-	rm -f *.bin
-	rm -f *.lbl
+	@rm -fR build
+	@rm -fR dist
+	@rm -f *.bin
+	@rm -f *.lbl
+
+.PHONY: burn
+burn:
+	@minipro -p AT28c256 -w dist/InterisROM.bin
 
 # This function is used to check that a file fits within the allocated size
 # Inputs:
