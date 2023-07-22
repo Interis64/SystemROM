@@ -54,7 +54,7 @@ SyscallExec:
     LD      (SyscallJump + 1), A            ; Write the jump address low byte
     POP     AF                              ; Restore AF
 SyscallJump:
-    JP      $0000                           ; This jump address is overwritten by the preceding code
+    JP      $FF00                           ; This jump address is overwritten by the preceding code
 
 NullInterruptHandler:
     EI
