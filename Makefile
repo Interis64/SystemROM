@@ -1,4 +1,6 @@
-all: main.z80 build/System.bin build/VDPDriver.bin build/OPLDriver.bin build/FDCDriver.bin
+all: dist/InterisROM.bin
+
+dist/InterisROM.bin: main.z80 build/System.bin build/VDPDriver.bin build/OPLDriver.bin build/FDCDriver.bin
 	@echo "Assembling main.z80"
 	@mkdir -p ./dist
 	@z80asm -Ibuild -o dist/InterisROM.bin main.z80
