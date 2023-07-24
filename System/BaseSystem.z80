@@ -49,12 +49,20 @@ WarmBoot:
 
 SyscallExec:
     PUSH    AF                              ; Preserve AF
-    LD      A, (SyscallTarget)              ; Get the syscall number
-    ADD     $80                             ; Adjust for jump table offset
-    LD      (SyscallJump + 1), A            ; Write the jump address low byte
+    PUSH    HL                              ; Preserve HL
+    LD      HL, SyscallTable                ; Load the base address of the table
+    LD      A, (SyscallTarget)              ; Load the call target
+    ADD     A, L                            ; Calculate the target address in the table
+    LD      L, A                            ; Update the table address
+    LD      A, (HL)                         ; Load the low byte of the vector into A
+    LD      (SyscallJump+1), A              ; Overwrite the low byte of the jump address
+    INC     HL                              ; Go to the next byte in the table
+    LD      A, (HL)                         ; Load the high byte of the vector into A
+    LD      (SyscallJump+2), A              ; Overwrite the high byte of the jump address
+    POP     HL                              ; Restore HL
     POP     AF                              ; Restore AF
 SyscallJump:
-    JP      $FF00                           ; This jump address is overwritten by the preceding code
+    JP      $0000                           ; This jump address gets overwritten by the above code
 
 NullInterruptHandler:
     EI
