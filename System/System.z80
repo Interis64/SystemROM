@@ -21,7 +21,7 @@
     SEEK    IRQ0Vector - SystemBase
     ORG     IRQ0Vector - SystemBase
     DW      NullInterruptHandler
-    DW      NullInterruptHandler
+    DW      PS2Keyboard.IRQHandler
     DW      NullInterruptHandler
     DW      NullInterruptHandler
     DW      NullInterruptHandler

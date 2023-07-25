@@ -72,8 +72,12 @@ Monitor.AcceptInput:
     XOR     A                               ; Zero out the length
     LD      (Monitor.CommandBufferLength), A        
     LD      HL, Monitor.CommandBuffer               ; Point HL at the command buffer
+    PUSH    AF
+    LD      A, Syscall.ReadChar
+    LD      (SyscallTarget), A
+    POP     AF
 Monitor.AcceptInputLoop:
-    CALL    BufferedInput.Read
+    RST     $10
 
     CP      '\n'                        ; Ignore LF character
     JP      Z, Monitor.AcceptInputLoop
@@ -100,6 +104,10 @@ Monitor.AcceptInputLoop:
     LD      A, (Monitor.CommandBufferLength)        ; Increment our length counter
     INC     A
     LD      (Monitor.CommandBufferLength), A        
+    PUSH    AF
+    LD      A, Syscall.ReadChar
+    LD      (SyscallTarget), A
+    POP     AF
     JP      Monitor.AcceptInputLoop                 ; Wait for the next input
 
 Monitor.AcceptBackspace:

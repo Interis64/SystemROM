@@ -97,14 +97,16 @@ PS2Keyboard.TranslateScanCode:
     RES     5, A
     PUSH    AF
 PS2Keyboard.SkipCtrl:
+    LD      A, Syscall.InputAccept
+    LD      (SyscallTarget), A
     POP     AF
     CP      0
-    CALL    NZ, BufferedInput.Accept        ; Accept it if we have a nonzero character
+    CALL    NZ, $0010                       ; Accept it if we have a nonzero character
     ; Continue through to IRQExit
     CP      '\r'
     JR      NZ, PS2Keyboard.IRQExit
     LD      A, '\n'
-    CALL    BufferedInput.Accept
+    RST     $10
 
 PS2Keyboard.IRQExit:
     XOR     A

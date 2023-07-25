@@ -29,12 +29,14 @@ ROMBoot:
     LD      DE, $8000
     LDIR
 
+    LD      A, $FF
+    LD      I, A
     EI                                              ; Enable interrupts for hardware detection
 
     ; Find and load hardware drivers
     CALL    VDP.Initialize
-    CALL    OPL.Initialize
-    CALL    FDC.Initialize
+;    CALL    OPL.Initialize
+;    CALL    FDC.Initialize
     JP      ColdBoot
 
     INCLUDE "VDP/Init.z80"
