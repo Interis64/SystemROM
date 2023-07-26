@@ -47,6 +47,9 @@ WarmBoot:
     RST     $10
 
     ; Attempt to boot from storage driver
+    ; LD      A, Syscall.DiskBoot
+    ; LD      (SyscallTarget), A
+    ; RST     $10
     ; If not, fall back to the monitor
     JP      Monitor.Start
 
@@ -66,6 +69,9 @@ SyscallExec:
     POP     AF                              ; Restore AF
 SyscallJump:
     JP      $0000                           ; This jump address gets overwritten by the above code
+
+SyscallNOP:
+    RET
 
 NullInterruptHandler:
     EI

@@ -29,10 +29,11 @@ FDC.Initialize:
     RET     Z                               ; Bail out if card is not installed
 
     LD      BC, FDCDriverEnd - FDCDriverStart          ; Get the driver size
-    LD      DE, $F400                       ; Set the driver destination address
+    LD      DE, StorageDriverBase                       ; Set the driver destination address
     LD      HL, FDCDriverStart                      ; Set the driver source address
     LDIR
 
+    CALL    FDC.SetupIOAddr
     CALL    FDCDriver.ResetFDC
     XOR     A
     LD      (FDCDriver.DriveNumber), A
@@ -42,10 +43,42 @@ FDC.Initialize:
     CALL    FDCDriver.DeselectDrives
 
     ; TODO: Install syscall routines
+       LD      HL, SyscallTable + $02
+       LD      DE, FDCDriver.Boot
+       LD      (HL), E
+       INC     HL
+       LD      (HL), D
+
     ; TODO: Set the hardware ID byte for the corresponding slot
 
     RET
 
 FDC.LookForCard:
+    LD      A, $01
+    LD      (FDC.InitInstalled), A
+    RET
+
+FDC.SetupIOAddr:
+    LD      A, SLOT7
+    LD      (FDCDriver.SLOT), A
+
+    ADD     A, SLOT7 + $10
+    LD      (FDCDriver.PORT_MSR), A
+
+    ADD     A, SLOT7 + $05
+    LD      (FDCDriver.PORT_TC), A
+
+    ADD     A, SLOT7 + $09
+    LD      (FDCDriver.PORT_LDCR), A
+
+    ADD     A, SLOT7 + $11
+    LD      (FDCDriver.PORT_CS), A
+
+    ADD     A, SLOT7 + $19
+    LD      (FDCDriver.PORT_LDOR), A
+
+    ADD     A, SLOT7 + $1C
+    LD      (FDCDriver.PORT_DISK_CHG), A
+
     RET
 

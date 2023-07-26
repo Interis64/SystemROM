@@ -1,8 +1,8 @@
-Syscall.Exec:           EQU $00
-    DW  SyscallExec                         ; $00 - Reboot
+Syscall.WarmBoot:       EQU $00
+    DW  WarmBoot                            ; $00 - (Nothing)
 
-Syscall.Reboot:         EQU $02
-    DW  WarmBoot                            ; $02 - (Nothing)
+Syscall.DiskBoot:       EQU $02
+    DW  SyscallNOP                          ; $02 - Boot from Storage
 
 Syscall.MonDebug:       EQU $04
     DW  Monitor.DebugHandler                ; $04 - Start Debug Monitor
@@ -35,4 +35,10 @@ Syscall.SerialTX:       EQU $16
     DW  Serial.TXA                          ; $16 - Serial Transmit Byte
 
 Syscall.SerialRX:       EQU $18
-    DW  BufferedInput.Accept                ; $16 - Serial Receive Byte
+    DW  BufferedInput.Accept                ; $18 - Serial Receive Byte
+
+Syscall.ReadBlock:      EQU $1A
+    DW  SyscallNOP                          ; $1A - Read Block from storage device
+
+Syscall.WriteBlock:     EQU $1C
+    DW  SyscallNOP                          ; $1A - Write Block to storage device
