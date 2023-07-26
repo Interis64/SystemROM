@@ -29,6 +29,7 @@ ROMBoot:
     LD      DE, $8000
     LDIR
 
+    IM      2
     LD      A, $FF
     LD      I, A
     EI                                              ; Enable interrupts for hardware detection
