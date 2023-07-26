@@ -25,6 +25,9 @@ ColdBoot:
     LDIR
     
     EI                                      ; Reenable interrupts
+
+    LD      HL, WarmBoot                    ; Change RST00 to Warm Boot
+    LD      ($0001), HL
     ; Continue with warm boot
 WarmBoot:
     CALL    PS2Keyboard.Initialize
