@@ -62,7 +62,6 @@ Serial.IRQHandler:
     LD      (SyscallTarget), A
     POP     AF
     RST     $10
-    CALL    BufferedInput.Accept
 Serial.IRQSkip:
     LD      A, Serial.RTS_LOW
     OUT     (Serial.CONTROL_PORT), A

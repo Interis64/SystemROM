@@ -69,7 +69,7 @@ Monitor.ControlLoop:
 Monitor.AcceptInput:
     LD      HL, Monitor.CommandPrompt               ; Print our prompt
     CALL    Utils.PrintString
-    XOR     A                               ; Zero out the length
+    XOR     A                                       ; Zero out the length
     LD      (Monitor.CommandBufferLength), A        
     LD      HL, Monitor.CommandBuffer               ; Point HL at the command buffer
     PUSH    AF
@@ -79,13 +79,13 @@ Monitor.AcceptInput:
 Monitor.AcceptInputLoop:
     RST     $10
 
-    CP      '\n'                        ; Ignore LF character
+    CP      '\n'                                    ; Ignore LF character
     JP      Z, Monitor.AcceptInputLoop
 
-    CP      '\r'                        ; CR completes input
+    CP      '\r'                                    ; CR completes input
     RET     Z
 
-    CP      $08                        ; Handle Backspace
+    CP      $08                                     ; Handle Backspace
     JP      Z, Monitor.AcceptBackspace
 
     CP      $1B
@@ -98,9 +98,9 @@ Monitor.AcceptInputLoop:
     LD      A, Syscall.PrintChar
     LD      (SyscallTarget), A
     LD      A, B
-    RST     $10                 ; Echo back to the screen
-    LD      (HL), A                         ; Stuff in the command buffer
-    INC     HL                              ; Move to the next location
+    RST     $10                                     ; Echo back to the screen
+    LD      (HL), A                                 ; Stuff in the command buffer
+    INC     HL                                      ; Move to the next location
     LD      A, (Monitor.CommandBufferLength)        ; Increment our length counter
     INC     A
     LD      (Monitor.CommandBufferLength), A        
@@ -112,13 +112,13 @@ Monitor.AcceptInputLoop:
 
 Monitor.AcceptBackspace:
     LD      A, (Monitor.CommandBufferLength)        ; Load our length counter
-    CP      $00                             ; If we're at zero length, can't backspace
+    CP      $00                                     ; If we're at zero length, can't backspace
     JP      Z, Monitor.AcceptInputLoop              ; So just go back to our input loop
     LD      A, Syscall.PrintChar
     LD      (SyscallTarget), A
-    LD      A, $08                     ;
-    RST     $10                             ; Output the backspace char
-    DEC     HL                              ; Go back a spot
+    LD      A, $08
+    RST     $10                                     ; Output the backspace char
+    DEC     HL                                      ; Go back a spot
     LD      A, (Monitor.CommandBufferLength)        ; Decrement our length counter
     DEC     A
     LD      (Monitor.CommandBufferLength), A

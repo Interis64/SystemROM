@@ -19,10 +19,9 @@
     INCLUDE "BaseSystem.z80"
 
     SEEK    IRQ0Vector - SystemBase
-    ORG     IRQ0Vector - SystemBase
     DW      NullInterruptHandler
     DW      PS2Keyboard.IRQHandler
-    DW      NullInterruptHandler
+    DW      Serial.IRQHandler
     DW      NullInterruptHandler
     DW      NullInterruptHandler
     DW      NullInterruptHandler
@@ -30,9 +29,7 @@
     DW      NullInterruptHandler
 
     SEEK    SyscallTable - SystemBase
-    ORG     SyscallTable - SystemBase
     INCLUDE "SyscallTable.z80"
 
     SEEK    $FFFF - SystemBase
-    ORG     $FFFF - SystemBase
     DB      $00
