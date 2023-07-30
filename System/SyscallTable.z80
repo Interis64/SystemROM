@@ -1,5 +1,5 @@
 Syscall.WarmBoot:       EQU $00
-    DW  WarmBoot                            ; $00 - (Nothing)
+    DW  WarmBoot                            ; $00 - Warm Boot
 
 Syscall.DiskBoot:       EQU $02
     DW  SyscallNOP                          ; $02 - Boot from Storage
