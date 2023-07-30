@@ -37,8 +37,8 @@ See the documentation for each syscall below for information on passing paramete
 
 | Call Number | Function                                                |
 | ----------- | ------------------------------------------------------- |
-|         $00 | Reserved                                                |
-|         $02 | Reset                                                   |
+|         $00 | Warm Reset                                                |
+|         $02 | Disk Boot                                                   |
 |         $04 | Start Debug Monitor                                     |
 |         $06 | Print character to output device                        |
 |         $08 | Print null-terminated string to output device           |
