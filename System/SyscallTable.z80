@@ -31,10 +31,10 @@ Syscall.NVRAMRead:      EQU $12
 Syscall.NVRAMWrite:     EQU $14
     DW  NVRAM.Write                         ; $14 - NVRAM Write Byte
 
-Syscall.SerialTX:       EQU $16
+Syscall.SerialOut:       EQU $16
     DW  Serial.TXA                          ; $16 - Serial Transmit Byte
 
-Syscall.SerialRX:       EQU $18
+Syscall.SerialIn:       EQU $18
     DW  BufferedInput.Accept                ; $18 - Serial Receive Byte
 
 Syscall.ReadBlock:      EQU $1A

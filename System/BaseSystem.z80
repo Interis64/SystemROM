@@ -35,6 +35,11 @@ WarmBoot:
     CALL    BufferedInput.Initialize
 
     ; Clear screen
+    LD      A, Syscall.Beep
+    LD      (SyscallTarget), A
+    RST     $10
+
+    ; Clear screen
     LD      A, Syscall.PrintChar
     LD      (SyscallTarget), A
     LD      A, $0C
@@ -47,9 +52,9 @@ WarmBoot:
     RST     $10
 
     ; Attempt to boot from storage driver
-    ; LD      A, Syscall.DiskBoot
-    ; LD      (SyscallTarget), A
-    ; RST     $10
+    LD      A, Syscall.DiskBoot
+    LD      (SyscallTarget), A
+    RST     $10
     ; If not, fall back to the monitor
     JP      Monitor.Start
 

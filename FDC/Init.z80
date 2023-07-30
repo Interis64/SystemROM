@@ -62,22 +62,22 @@ FDC.SetupIOAddr:
     LD      A, SLOT7
     LD      (FDCDriver.SLOT), A
 
-    ADD     A, SLOT7 + $10
+    LD      A, SLOT7 + $10
     LD      (FDCDriver.PORT_MSR), A
 
-    ADD     A, SLOT7 + $05
+    LD      A, SLOT7 + $05
     LD      (FDCDriver.PORT_TC), A
 
-    ADD     A, SLOT7 + $09
+    LD      A, SLOT7 + $09
     LD      (FDCDriver.PORT_LDCR), A
 
-    ADD     A, SLOT7 + $11
+    LD      A, SLOT7 + $11
     LD      (FDCDriver.PORT_CS), A
 
-    ADD     A, SLOT7 + $19
+    LD      A, SLOT7 + $19
     LD      (FDCDriver.PORT_LDOR), A
 
-    ADD     A, SLOT7 + $1C
+    LD      A, SLOT7 + $1C
     LD      (FDCDriver.PORT_DISK_CHG), A
 
     RET

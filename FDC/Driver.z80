@@ -295,12 +295,13 @@ ReadSector:
 
 
     ; Execution Phase, transfer data into buffer
+    ; This code is extremely time-sensitive, tweak with caution
     LD      HL, (DataBuffer)                ; Get the pointer to the data buffer
     LD      DE, $0000                       ; Timeout value
 ReadSectorDataLoop:
-    LD      A, (PORT_MSR)
-    LD      C, A
-    IN      A, (C)
+    ; LD      A, (PORT_MSR)
+    ; LD      C, A
+    IN      A, ($F0)
     CP      $F0
     JP      Z, ReadDataByte
     CP      $D0
@@ -313,9 +314,9 @@ ReadSectorDataLoop:
     JP      Z, ReadSectorTimeout            ; If so, bail to the timeout routine
     JP      ReadSectorDataLoop
 ReadDataByte:
-    LD      A, (PORT_CS)
-    LD      C, A
-    IN      A, (C)
+    ; LD      A, (PORT_CS)
+    ; LD      C, A
+    IN      A, ($F1)                        ; TODO: fix this... we don't have enough cycles to load it from memory every time
     LD      (HL), A
     INC     HL
     JR      ReadSectorDataLoop
@@ -368,14 +369,12 @@ ReadSectorDataComplete:
 ; Then transfer execution to that code if it exists
 ; -------------------------------------
 Boot:
-    LD      HL, DriveNumber
-    LD      (HL), $00
-    LD      HL, TrackNumber
-    LD      (HL), $00
-    LD      HL, HeadNumber
-    LD      (HL), $00
-    LD      HL, SectorNumber
-    LD      (HL), $01
+    XOR     A
+    LD      (DriveNumber), A
+    LD      (TrackNumber), A
+    LD      (HeadNumber), A
+    INC     A
+    LD      (SectorNumber), A
 
     ; Point the data buffer to our bootstrap location
     LD      HL, BootCodeAddress
