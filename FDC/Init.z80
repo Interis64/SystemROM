@@ -42,12 +42,9 @@ FDC.Initialize:
     CALL    FDCDriver.Recalibrate
     CALL    FDCDriver.DeselectDrives
 
-    ; TODO: Install syscall routines
-       LD      HL, SyscallTable + $02
-       LD      DE, FDCDriver.Boot
-       LD      (HL), E
-       INC     HL
-       LD      (HL), D
+    ; Install syscall routines
+    LD      HL, FDCDriver.Boot
+    LD      (SyscallTable + $02), HL
 
     ; TODO: Set the hardware ID byte for the corresponding slot
 
