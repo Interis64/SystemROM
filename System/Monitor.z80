@@ -420,11 +420,36 @@ Monitor.ProcessQuitCommand:
 
 ; -------------------------------------
 ; I/O Out command [O]
+; - Syntax: O XX YY
+; - Where XX is the IO Adddress
+; - and YY is the byte to output
 ; -------------------------------------
+    LD      A, (Monitor.CommandBufferLength)        ; Check command length
+    CP      7                                       ; 7 bytes
+    JP      NZ, Monitor.CommandError
+    LD      HL, Monitor.CommandBuffer+2
+    CALL    Monitor.ReadHexByte
+    LD      C, A
+    LD      HL, Monitor.CommandBuffer+6
+    OUT     (C), A
+    CALL    Utils.PrintCRLF
+    RET                                             ; Return to the previous address (outside of Monitor)
 
 ; -------------------------------------
 ; I/O In command [I]
+; - Syntax: O XX
+; - Where XX is the IO Adddress
 ; -------------------------------------
+    LD      A, (Monitor.CommandBufferLength)        ; Check command length
+    CP      4                                       ; 4 bytes
+    JP      NZ, Monitor.CommandError
+    LD      HL, Monitor.CommandBuffer+2
+    CALL    Monitor.ReadHexByte
+    LD      C, A
+    IN      A, (C)
+    CALL    Monitor.PrintHexByte
+    CALL    Utils.PrintCRLF
+    RET                                             ; Return to the previous address (outside of Monitor)
 
 ; ------------------------------------------------------------------------------
 ; Hexadecimal I/O routines
