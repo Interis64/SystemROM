@@ -18,6 +18,7 @@
 VDP.InitInstalled:      EQU ScratchPad
 VDP.InitControlPort:    EQU ScratchPad + 1
 VDP.InitDataPort:       EQU ScratchPad + 2
+VDP.HardwareID:         EQU $10
 
 VDP.Initialize:
     ; Clear the installed flag (this will be set based on tests later in the init routine)
@@ -26,19 +27,29 @@ VDP.Initialize:
 
     CALL    VDP.LookForCard
     LD      A, (VDP.InitInstalled)
-    CP      $00                             ; Check if the card is not installed
-    RET     Z                               ; Bail out if card is not installed
+    CP      $00                                     ; Check if the card is not installed
+    RET     Z                                       ; Bail out if card is not installed
 
-    LD      BC, VDPDriverEnd - VDPDriverStart     ; Get the driver size
-    LD      DE, VideoDriverBase             ; Set the driver destination address
-    LD      HL, VDPDriverStart              ; Set the driver source address
+    LD      BC, VDPDriverEnd - VDPDriverStart       ; Get the driver size
+    LD      DE, VideoDriverBase                     ; Set the driver destination address
+    LD      HL, VDPDriverStart                      ; Set the driver source address
     LDIR
 
     ; Install system call overrides
     LD      HL, VDPDriver.PrintChar
-    LD      (SyscallTable + Syscall.PrintChar), HL        ; Override PrintChar
+    LD      (SyscallTable + Syscall.PrintChar), HL  ; Override PrintChar
 
-    ; TODO: Set the hardware ID byte for the corresponding slot
+    ; Set the hardware ID byte for the corresponding slot
+    LD      HL, SLOT4HardwareID - 4
+    LD      A, (VDP.InitDataPort)
+    SRL     A                                       ; Shift the IO address to get a slot number
+    SRL     A
+    SRL     A
+    SRL     A
+    SRL     A
+    ADD     A, L                                    ; Point to the slot's Hardware ID address
+    LD      L, A
+    LD      (HL), VDP.HardwareID                    ; Load our Hardware ID
 
     ; Copy I/O addresses to the driver
     LD      A, (VDP.InitControlPort)
@@ -46,14 +57,14 @@ VDP.Initialize:
     LD      A, (VDP.InitDataPort)
     LD      (VDPDriver.DataPort), A
 
-    LD      A, $FF                          ; Set the default cursor character
+    LD      A, $FF                                  ; Set the default cursor character
     LD      (VDPDriver.CursorChar), A
     
-    LD      A, 1                            ; Enable blinking cursor
+    LD      A, 1                                    ; Enable blinking cursor
     LD      (VDPDriver.CursorBlinkEnabled), A
 
-    LD      A, (VDPDriver.DataPort)         ; Load the IO address into A
-    SRL     A                               ; A >> 4 to get IRQ number
+    LD      A, (VDPDriver.DataPort)                 ; Load the IO address into A
+    SRL     A                                       ; A >> 4 to get IRQ number
     SRL     A
     SRL     A
     SRL     A
@@ -126,6 +137,21 @@ VDP.Initialize:
 VDP.LookForCard:
     LD      A, $80                          ; Start looking at base address 0x80
 VDP.LookForCardLoop:
+    PUSH    HL                                  ; Check if there's an existing Hardware ID for that slot
+    PUSH    AF
+    SRL     A                                   ; Shift the IO address to get a slot number
+    SRL     A
+    SRL     A
+    SRL     A
+    SRL     A
+    ADD     A, L                                ; Point to the slot's Hardware ID address
+    LD      L, A
+    LD      A, (HL)                             ; Load our Hardware ID
+    POP     HL
+    CP      $00
+    JP      NZ, VDP.LookForCard.SlotOccupied    ; If there's a Hardware ID, skip this and go to the next
+    POP     AF
+
     LD      (VDP.InitDataPort), A           ; Store base address as data port
     INC     A
     LD      (VDP.InitControlPort), A        ; Store base address + 1 as control port
@@ -133,6 +159,8 @@ VDP.LookForCardLoop:
     PUSH    AF
     CALL    VDP.CheckCardExists             ; Writes and reads back some VRAM to validate the card
     JP      Z, VDP.FoundCard
+
+VDP.LookForCard.SlotOccupied:
     POP     AF
 
     CP      $E1                             ; Check if we've looked in all four slots
