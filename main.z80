@@ -41,7 +41,7 @@ ROMBoot:
 
     ; Find and load hardware drivers
     CALL    VDP.Initialize
-;    CALL    OPL.Initialize
+    CALL    OPL.Initialize
     CALL    FDC.Initialize
     JP      ColdBoot
 

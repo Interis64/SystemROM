@@ -1,5 +1,5 @@
 ; ------------------------------------------------------------------------------
-; opl2.z80
+; OPL/Driver.z80
 ; ------------------------------------------------------------------------------
 ; Support for Yamaha YM3812 (OPL-II) FM Synthesis chip.
 ; ------------------------------------------------------------------------------
@@ -14,9 +14,9 @@
 
     ORG     AudioDriverBase
 
-Installed:      EQU $8300
-AddressPort:    EQU $8301
-DataPort:       EQU $8302
+Installed:      DS  1
+AddressPort:    DS  1
+DataPort:       DS  1
 
 ; Register numbers
 R_TEST:         EQU $00                     ; Test Data / OPL2 Waveform Enable (bit5)

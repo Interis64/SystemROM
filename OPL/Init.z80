@@ -1,5 +1,5 @@
 ; ------------------------------------------------------------------------------
-; opl.z80
+; OPL/Init.z80
 ; ------------------------------------------------------------------------------
 ; Support for Yamaha YM3812 (OPL-II) FM Synthesis chip.
 ; ------------------------------------------------------------------------------
@@ -9,11 +9,11 @@
 ; Copyright 2023 Matthew Martin
 ; Licensed under the GNU GPL 3.0. See the LICENSE file for details.
 ; ------------------------------------------------------------------------------
-; ------------------------------------------------------------------------------
 
-OPL.Installed:      EQU $8300
-OPL.AddressPort:    EQU $8301
-OPL.DataPort:       EQU $8302
+OPL.InitInstalled:      EQU ScratchPad
+OPL.InitAddressPort:    EQU ScratchPad + 1
+OPL.InitDataPort:       EQU ScratchPad + 2
+OPL.HardwareID:         EQU $20
 
 ; Register numbers
 OPL.R_TEST:         EQU $00                     ; Test Data / OPL2 Waveform Enable (bit5)
@@ -35,51 +35,75 @@ OPL.R_WAVE:         EQU $E0                     ; Waveform Select
 OPL.Initialize: ; Initialize the OPL2
     ; Clear the installed flag (this will be set based on tests later in the init routine)
     LD      A, $00
-    LD      (OPL.Installed), A
+    LD      (OPL.InitInstalled), A
 
     ; Set up control port location from NVRAM config
     ; Set up data port location from NVRAM config
-    LD      A, NVRAM.OPL2_SLOT
-    CALL    NVRAM.GetIOPort
-    CP      $FF                                 ; Check if the port is $FF (not installed)
-    RET     Z                                   ; Bail out if card is not installed
-    LD      (OPL.AddressPort), A                ; Store base address as data port
-    INC     A
-    LD      (OPL.DataPort), A                   ; Store base address + 1 as control port
+    CALL    OPL.LookForCard
+    LD      A, (OPL.InitInstalled)
+    CP      $00                                     ; Check if the card is not installed
+    RET     Z                                       ; Bail out if card is not installed
 
-    DEC     A                                   ; Get back to base address
-    SRA     A                                   ; A >> 4 to get IRQ number
-    SRA     A
-    SRA     A
-    SRA     A
-    AND     $0F
-    LD      HL, $FF00                       ; Point HL at the interrupt table
+    LD      BC, OPLDriverEnd - OPLDriverStart       ; Get the driver size
+    LD      DE, AudioDriverBase                     ; Set the driver destination address
+    LD      HL, OPLDriverStart                      ; Set the driver source address
+    LDIR
+
+    ; Install system call overrides
+    LD      HL, OPLDriver.Beep
+    LD      (SyscallTable + Syscall.Beep), HL       ; Override Beep
+
+    ; Set the hardware ID byte for the corresponding slot
+    LD      HL, SLOT4HardwareID - 4
+    LD      A, (OPL.InitAddressPort)
+    SRL     A                                       ; Shift the IO address to get a slot number
+    SRL     A
+    SRL     A
+    SRL     A
+    SRL     A
+    ADD     A, L                                    ; Point to the slot's Hardware ID address
+    LD      L, A
+    LD      (HL), OPL.HardwareID                    ; Load our Hardware ID
+
+    ; Copy I/O addresses to the driver
+    LD      A, (OPL.InitAddressPort)
+    LD      (OPLDriver.AddressPort), A
+    LD      A, (OPL.InitDataPort)
+    LD      (OPLDriver.DataPort), A
+
+    LD      A, (OPLDriver.AddressPort)              ; Load the IO address into A
+    SRL     A                                       ; A >> 4 to get IRQ number
+    SRL     A
+    SRL     A
+    SRL     A
+    LD      HL, IRQ0Vector                          ; Point HL at the interrupt table
     LD      D, 0
     LD      E, A
-    ADD     HL, DE                          ; Add enough for this slot
+    ADD     HL, DE                                  ; Add enough for this slot
     LD      DE, OPLDriver.IRQHandler
-    LD      (HL), E                         ; Plop our IRQ routine pointer there
+    LD      (HL), E                                 ; Plop our IRQ routine pointer there
     INC     HL
     LD      (HL), D
 
     CALL    OPL.ResetAll
 
     LD      H, OPL.R_TEST                       ; Reg $00: Test Information
-    LD      L, 00010000b                    ; Set D5 to 1 to enable OPL2 waves
+    LD      L, 00010000b                        ; Set D5 to 1 to enable OPL2 waves
     CALL    OPL.WriteRegister
 
     LD      H, OPL.R_TIMERC                     ; Reg $04: Timer Control
-    LD      L, 10000000b                    ; Reset both timers
+    LD      L, 10000000b                        ; Reset both timers
     CALL    OPL.WriteRegister
 
     LD      H, OPL.R_CSMKSP                     ; REG $08: CSM Sel / Key Spl
-    LD      L, 00000000b                    ; CSM Off, (no idea about Key Spl)
+    LD      L, 00000000b                        ; CSM Off, (no idea about Key Spl)
     CALL    OPL.WriteRegister
 
-    LD      H, $BD                          ; Reg $BD: AM / Vib / Rhythm
-    LD      L, 00000000b                    ; AM Weak, Vib Weak, Rhythm Off
+    LD      H, $BD                              ; Reg $BD: AM / Vib / Rhythm
+    LD      L, 00000000b                        ; AM Weak, Vib Weak, Rhythm Off
     CALL    OPL.WriteRegister
 
+    RET
 ; ------------------------------------------------------------------------------
 ;                          Detecting a Sound Card
 ;
@@ -100,6 +124,47 @@ OPL.Initialize: ; Initialize the OPL2
 ;          result of step 7 should be C0h.  If both are correct, an
 ;          AdLib-compatible board is installed in the computer.
 ; ------------------------------------------------------------------------------
+
+OPL.LookForCard:
+    LD      A, $80                              ; Start looking at base address 0x80
+OPL.LookForCardLoop:                            
+    PUSH    HL                                  ; Check if there's an existing Hardware ID for that slot
+    PUSH    AF
+    SRL     A                                   ; Shift the IO address to get a slot number
+    SRL     A
+    SRL     A
+    SRL     A
+    SRL     A
+    ADD     A, L                                ; Point to the slot's Hardware ID address
+    LD      L, A
+    LD      A, (HL)                             ; Load our Hardware ID
+    POP     HL
+    CP      $00
+    JP      NZ, OPL.LookForCard.SlotOccupied    ; If there's a Hardware ID, skip this and go to the next
+    POP     AF
+    
+    LD      (OPL.InitAddressPort), A            ; Store base address as data port
+    INC     A
+    LD      (OPL.InitDataPort), A               ; Store base address + 1 as control port
+
+    PUSH    AF
+    CALL    OPL.VerifyCardInstalled             ; Does the check outlined above to see if the card is installed
+    JP      Z, OPL.FoundCard
+
+OPL.LookForCard.SlotOccupied:
+    POP     AF
+    CP      $E1                                 ; Check if we've looked in all four slots
+    RET     NC                                  ; If so, we're done, no card found
+    ADD     A, $1F                              ; If not, move to the next slot...
+    JP      OPL.LookForCardLoop                 ; and do the check again
+
+OPL.FoundCard:
+    LD      A, $01
+    LD      (OPL.InitInstalled), A
+    POP     AF
+    RET
+
+
 OPL.VerifyCardInstalled:
 
     LD      HL, $0460
@@ -108,7 +173,7 @@ OPL.VerifyCardInstalled:
     LD      HL, $0480
     CALL    OPL.WriteRegister
 
-    LD      A, (OPL.AddressPort)                ; Read status register
+    LD      A, (OPL.InitAddressPort)                ; Read status register
     LD      C, A
     IN      A, (C)
     AND     $E0
@@ -121,16 +186,16 @@ OPL.VerifyCardInstalled:
     LD      HL, $0421
     CALL    OPL.WriteRegister
 
-    DI                                      ; Disable interrupts so we don't get stuck in here
+    DI                                          ; Disable interrupts so we don't get stuck in here
 
     ; Delay 80µs
-    LD      B, $10                          ; Run this loop 16 times (811 T-states total, about 110 µs)
+    LD      B, $10                              ; Run this loop 16 times (811 T-states total, about 110 µs)
 OPL.VerifyTimerDelay:
-    EX      (SP), HL                        ; 19 T-states
-    EX      (SP), HL                        ; 19 T-states
+    EX      (SP), HL                            ; 19 T-states
+    EX      (SP), HL                            ; 19 T-states
     DJNZ    OPL.VerifyTimerDelay                ; 13/8 T-states
 
-    LD      A, (OPL.AddressPort)                ; Read status register
+    LD      A, (OPL.InitAddressPort)            ; Read status register
     LD      C, A
     IN      A, (C)
 
@@ -140,14 +205,14 @@ OPL.VerifyTimerDelay:
     LD      HL, $0480
     CALL    OPL.WriteRegister
 
-    EI                                      ; Reenable interrupts
+    EI                                          ; Reenable interrupts
 
     AND     $E0
     CP      $C0
     RET     NZ
 
     LD      A, $01
-    LD      (OPL.Installed), A
+    LD      (OPL.InitInstalled), A
 
     RET
 
@@ -215,13 +280,13 @@ OPL.WaitLoop:
 OPL.WriteRegister:
     PUSH    AF
     PUSH    BC
-    LD      A, (OPL.AddressPort)
+    LD      A, (OPL.InitAddressPort)
     LD      C, A
     LD      A, H
     OUT     (C), A
     LD      B, $04
     DJNZ    $
-    LD      A, (OPL.DataPort)
+    LD      A, (OPL.InitDataPort)
     LD      C, A
     LD      A, L
     OUT     (C), A
