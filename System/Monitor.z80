@@ -147,6 +147,14 @@ Monitor.ProcessInput:
     JP      Z, Monitor.ProcessDumpCommand
     CP      'd'
     JP      Z, Monitor.ProcessDumpCommand
+    CP      'I'
+    JP      Z, Monitor.ProcessInputCommand
+    CP      'i'
+    JP      Z, Monitor.ProcessInputCommand
+    CP      'O'
+    JP      Z, Monitor.ProcessOutputCommand
+    CP      'o'
+    JP      Z, Monitor.ProcessOutputCommand
     CP      'Q'
     JP      Z, Monitor.ProcessQuitCommand
     CP      'q'
@@ -424,6 +432,7 @@ Monitor.ProcessQuitCommand:
 ; - Where XX is the IO Adddress
 ; - and YY is the byte to output
 ; -------------------------------------
+Monitor.ProcessOutputCommand:
     LD      A, (Monitor.CommandBufferLength)        ; Check command length
     CP      7                                       ; 7 bytes
     JP      NZ, Monitor.CommandError
@@ -437,9 +446,10 @@ Monitor.ProcessQuitCommand:
 
 ; -------------------------------------
 ; I/O In command [I]
-; - Syntax: O XX
+; - Syntax: I XX
 ; - Where XX is the IO Adddress
 ; -------------------------------------
+Monitor.ProcessInputCommand:
     LD      A, (Monitor.CommandBufferLength)        ; Check command length
     CP      4                                       ; 4 bytes
     JP      NZ, Monitor.CommandError

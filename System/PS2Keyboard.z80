@@ -102,11 +102,6 @@ PS2Keyboard.SkipCtrl:
     POP     AF
     CP      0
     CALL    NZ, $0010                       ; Accept it if we have a nonzero character
-    ; Continue through to IRQExit
-    CP      '\r'
-    JR      NZ, PS2Keyboard.IRQExit
-    LD      A, '\n'
-    RST     $10
 
 PS2Keyboard.IRQExit:
     XOR     A
