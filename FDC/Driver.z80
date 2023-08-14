@@ -306,8 +306,6 @@ ReadSectorDataLoop:
     JP      Z, ReadDataByte
     CP      $D0
     JP      Z, ReadSectorDataComplete       ; IF the execution bit is reset, then jump to reading results
-    ; CP      $C0                             ; Execution Aborted
-    ; JP      Z, ReadSectorAbort
     DEC     DE                              ; Nothing happening? Decrement our timeout counter and try again
     LD      A, D
     OR      E                               ; Has our timeout counter timed out?
@@ -320,12 +318,6 @@ ReadDataByte:
     LD      (HL), A
     INC     HL
     JR      ReadSectorDataLoop
-
-ReadSectorAbort:
-    POP     DE
-    POP     HL
-    EI
-    RET
 
 ReadSectorTimeout:
     POP     DE
@@ -369,6 +361,18 @@ ReadSectorDataComplete:
 ; Then transfer execution to that code if it exists
 ; -------------------------------------
 Boot:
+    ; Clear the read buffer
+    LD      B, 0
+    LD      HL, BootCodeAddress
+ClearLoop:
+    LD      (HL), $00
+    INC     HL
+    DJNZ    ClearLoop
+ClearLoop2:
+    LD      (HL), $00
+    INC     HL
+    DJNZ    ClearLoop2
+
     XOR     A
     LD      (DriveNumber), A
     LD      (TrackNumber), A
