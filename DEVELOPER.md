@@ -30,6 +30,52 @@ The information in this document will be invaluable to developers writing softwa
 | \$0000-$00FF | Reserved for Z80 reset vectors    |
 
 
+## Hardware IDs
+
+Each of the expansion slots can accept any sort of expansion card.
+The four Hardware ID memory slots (\$FFFB-$FFFE) are populated by the card initialization routines to identify which
+optional hardware is in which slot.
+
+By convention, Hardware IDs are assigned by device category, as follows:
+
+| Hardware ID  | Device Type                       |
+| ------------ | --------------------------------- |
+| $00 - $0F    | Reserved for built-in devices     |
+| $10 - $1F    | Video and display devices         |
+| $20 - $2F    | Sound and music devices           |
+| $30 - $3F    | Data storage devices              |
+| $40 - $4F    | Human interface devices           |
+| $50 - $5F    | Communication devices             |
+| $60 - $6F    | Data Processing devices           |
+| $70 - $FF    | Other devices                     |
+
+### Currently Assigned Hardware IDs
+
+*Note:* Some of the devices listed here are in-development and are unsupported.
+#### Video and Display Devices
+- $10 - TMS9918A Video Card
+- $11 - Graphic LCD Driver Card
+- $11 - Character LCD Driver Card
+
+#### Sound and Music Devices
+- $20 - Yamaha OPL2 Sound Card
+- $21 - SN76489 Sound Card
+
+#### Data Storage Devices
+- $30 - WD37C65C Floppy Disk Controller Card
+- $31 - Secure Digital Adapter Card
+- $32 - CompactFlash Adapter Card
+
+#### Human Interface Devices
+- $40 - Game Controller Card
+- $41 - PC Joystick Card
+
+#### Communication Devices
+- $50 - Parallel Port Card
+
+#### Data Processing Devices
+- $60 - AM9511A Math Coprocessor Card
+
 ## System Calls
 
 To make a system call (syscall), load the system call number into memory at `$FFFF` and issue a `RST $10` instruction.
@@ -37,8 +83,8 @@ See the documentation for each syscall below for information on passing paramete
 
 | Call Number | Function                                                |
 | ----------- | ------------------------------------------------------- |
-|         $00 | Warm Reset                                                |
-|         $02 | Disk Boot                                                   |
+|         $00 | Warm Reset                                              |
+|         $02 | Disk Boot                                               |
 |         $04 | Start Debug Monitor                                     |
 |         $06 | Print character to output device                        |
 |         $08 | Print null-terminated string to output device           |
