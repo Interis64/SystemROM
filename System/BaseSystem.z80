@@ -10,6 +10,13 @@
 ; Copyright 2023 Matthew Martin
 ; Licensed under the GNU GPL 3.0. See the LICENSE file for details.
 ; ------------------------------------------------------------------------------
+SYSCALL: MACRO CALLNUM
+    PUSH    AF
+    LD      A, CALLNUM
+    LD      ($FFFF), A
+    POP     AF
+    RST     $10
+    ENDM
 
 ColdBoot:
     DI                                      ; Don't interrupt this process
@@ -35,24 +42,24 @@ WarmBoot:
     CALL    BufferedInput.Initialize
 
     ; Clear screen
-    LD      A, Syscall.Beep
+    LD      A, SC_Beep
     LD      (SyscallTarget), A
     RST     $10
 
     ; Clear screen
-    LD      A, Syscall.PrintChar
+    LD      A, SC_PrintChar
     LD      (SyscallTarget), A
     LD      A, $0C
     RST     $10
 
     ; Print welcome messages
-    LD      A, Syscall.PrintString
+    LD      A, SC_PrintString
     LD      (SyscallTarget), A
     LD      HL, StartupMessage
     RST     $10
 
     ; Attempt to boot from storage driver
-    LD      A, Syscall.DiskBoot
+    LD      A, SC_DiskBoot
     LD      (SyscallTarget), A
     RST     $10
     ; If not, fall back to the monitor

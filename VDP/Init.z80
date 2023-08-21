@@ -37,7 +37,7 @@ VDP.Initialize:
 
     ; Install system call overrides
     LD      HL, VDPDriver.PrintChar
-    LD      (SyscallTable + Syscall.PrintChar), HL  ; Override PrintChar
+    LD      (SyscallTable + SC_PrintChar), HL  ; Override PrintChar
 
     ; Set the hardware ID byte for the corresponding slot
     LD      HL, SLOT4HardwareID - 4

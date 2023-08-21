@@ -11,7 +11,7 @@
 ; ------------------------------------------------------------------------------
 
 Utils.PrintString:
-    LD      A, Syscall.PrintChar            ; Set syscall $06
+    LD      A, SC_PrintChar            ; Set syscall $06
     LD      (SyscallTarget), A
 Utils.PrintStringLoop:
     LD      A, (HL)                         ; Get character
@@ -22,7 +22,7 @@ Utils.PrintStringLoop:
     JR      Utils.PrintStringLoop           ; Continue until $00
 
 Utils.PrintCRLF:
-    LD      A, Syscall.PrintChar            ; Set syscall $06
+    LD      A, SC_PrintChar            ; Set syscall $06
     LD      (SyscallTarget), A
     LD      A, '\r'
     RST     $10

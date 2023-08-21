@@ -58,7 +58,7 @@ Serial.IRQHandler:
     OUT     (Serial.CONTROL_PORT), A
     IN      A, (Serial.DATA_PORT)
     PUSH    AF
-    LD      A, Syscall.SerialIn
+    LD      A, SC_SerialIn
     LD      (SyscallTarget), A
     POP     AF
     RST     $10

@@ -51,7 +51,7 @@ OPL.Initialize: ; Initialize the OPL2
 
     ; Install system call overrides
     LD      HL, OPLDriver.Beep
-    LD      (SyscallTable + Syscall.Beep), HL       ; Override Beep
+    LD      (SyscallTable + SC_Beep), HL       ; Override Beep
 
     ; Set the hardware ID byte for the corresponding slot
     LD      HL, SLOT4HardwareID - 4

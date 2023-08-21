@@ -97,7 +97,7 @@ PS2Keyboard.TranslateScanCode:
     RES     5, A
     PUSH    AF
 PS2Keyboard.SkipCtrl:
-    LD      A, Syscall.InputAccept
+    LD      A, SC_InputAccept
     LD      (SyscallTarget), A
     POP     AF
     CP      0
