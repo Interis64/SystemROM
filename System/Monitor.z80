@@ -157,27 +157,17 @@ Monitor.ProcessInput:
     JP      Z, Monitor.ProcessQuitCommand
     CP      'q'
     JP      Z, Monitor.ProcessQuitCommand
+
     ; Unknown, so complain to the user and ask again
 Monitor.CommandError:
-    LD      HL, Monitor.ErrorString
-    CALL    Utils.PrintString
-    LD      HL, Monitor.CommandBuffer
-    LD      B, Monitor.CommandBufferMax
-    PUSH    AF
-    LD      A, $06
-    LD      ($FFFF), A
-    POP     AF
-Monitor.CommandErrorLoop:
-    RST     $10
-    INC     HL
-    DJNZ    Monitor.CommandErrorLoop
-    RET
+    LD      HL, Monitor.UnknownCommandString
+    JP      Utils.PrintString
 
 ; -------------------------------------
 ; Memory Editor Command [M addr]
 ; -------------------------------------
 Monitor.ProcessMemoryEditorCommand:
-    LD      A, (Monitor.CommandBufferLength)        ; Check command length
+    LD      A, (Monitor.CommandBufferLength) ; Check command length
     CP      6                               ; 6 bytes
     JP      NZ, Monitor.CommandError
     LD      HL, Monitor.CommandBuffer+2
@@ -187,7 +177,15 @@ Monitor.ProcessMemoryEditorCommand:
 
     LD      A, '\n'
     SYSCALL SC_PrintChar
-    ; Fall through to ME_ControlLoop (Tail Call)
+    JP      Monitor.ME_ControlLoop
+
+Monitor.MemoryEditorCommandError:
+    LD      HL, Monitor.MemoryEditorCommandErrorString
+    JP      Utils.PrintString
+
+Monitor.MemoryEditorCommandErrorString:
+    DB      " ?? Syntax Error, expected \"M addr\"", $00
+
 
 Monitor.ME_ControlLoop:
     CALL    Monitor.ME_PrintMemory
@@ -369,11 +367,18 @@ Monitor.ME_DataError:
 Monitor.ProcessExecuteCommand:
     LD      A, (Monitor.CommandBufferLength)        ; Check command length
     CP      6                               ; 6 bytes
-    JP      NZ, Monitor.CommandError
+    JP      NZ, Monitor.ExecuteCommandError
     LD      HL, Monitor.CommandBuffer+2
     CALL    Monitor.ReadHexWord
     PUSH    DE                              ; Push onto the stack and we'll abuse RET to jump there
     RET                                     ; This is going to jump to the address we just pushed from DE
+
+Monitor.ExecuteCommandError:
+    LD      HL, Monitor.ExecuteCommandErrorString
+    JP      Utils.PrintString
+
+Monitor.ExecuteCommandErrorString:
+    DB      " ?? Syntax Error, expected \"X addr\"", $00
 
 ; Note that we don't really expect to come back from where we jumped,
 ; but a RET from there will send us back into the monitor loop
@@ -384,16 +389,16 @@ Monitor.ProcessExecuteCommand:
 Monitor.ProcessDumpCommand:
     LD      A, (Monitor.CommandBufferLength)        ; Check command length
     CP      11                              ; 11 bytes
-    JP      NZ, Monitor.CommandError
+    JP      NZ, Monitor.DumpCommandError
     LD      HL, Monitor.CommandBuffer+1
     LD      A, (HL)
     CP      $20                             ; Next char needs to be ASCII space
-    JP      Z, Monitor.CommandError
+    JP      Z, Monitor.DumpCommandError
     INC     HL
-    CALL    Monitor.ReadHexWord                     ; This is the starting address
+    CALL    Monitor.ReadHexWord             ; This is the starting address
     PUSH    DE
     INC     HL                              ; Skip the space
-    CALL    Monitor.ReadHexWord                     ; This is the byte length
+    CALL    Monitor.ReadHexWord             ; This is the byte length
     LD      B, D                            ; Copy to our counter
     LD      C, E
     POP     HL                              ; Get the address into HL
@@ -412,17 +417,31 @@ Monitor.DumpLoop:
 
     RET
 
+Monitor.DumpCommandError:
+    LD      HL, Monitor.DumpCommandErrorString
+    JP      Utils.PrintString
+
+Monitor.DumpCommandErrorString:
+    DB      " ?? Syntax Error, expected \"D addr size\"", $00
 
 ; -------------------------------------
 ; Quit command [Q]
 ; -------------------------------------
 Monitor.ProcessQuitCommand:
-    LD      A, (Monitor.CommandBufferLength)        ; Check command length
+    LD      A, (Monitor.CommandBufferLength) ; Check command length
     CP      1                               ; 1 byte
-    JP      NZ, Monitor.CommandError
+    JP      NZ, Monitor.QuitCommandError
     CALL    Utils.PrintCRLF
     POP     HL                              ; Pop off our monitor return address
     RET                                     ; Return to the previous address (outside of Monitor)
+
+Monitor.QuitCommandError:
+    LD      HL, Monitor.QuitCommandErrorString
+    JP      Utils.PrintString
+
+Monitor.QuitCommandErrorString:
+    DB      " ?? Syntax Error, expected \"Q\"", $00
+
 
 ; -------------------------------------
 ; I/O Out command [O]
@@ -433,7 +452,7 @@ Monitor.ProcessQuitCommand:
 Monitor.ProcessOutputCommand:
     LD      A, (Monitor.CommandBufferLength)        ; Check command length
     CP      7                                       ; 7 bytes
-    JP      NZ, Monitor.CommandError
+    JP      NZ, Monitor.OutputCommandError
     LD      HL, Monitor.CommandBuffer+2
     CALL    Monitor.ReadHexByte
     LD      C, A
@@ -441,6 +460,13 @@ Monitor.ProcessOutputCommand:
     OUT     (C), A
     CALL    Utils.PrintCRLF
     RET                                             ; Return to the previous address (outside of Monitor)
+
+Monitor.OutputCommandError:
+    LD      HL, Monitor.OutputCommandErrorString
+    JP      Utils.PrintString
+
+Monitor.OutputCommandErrorString:
+    DB      " ?? Syntax Error, expected \"O port data\"", $00
 
 ; -------------------------------------
 ; I/O In command [I]
@@ -459,6 +485,13 @@ Monitor.ProcessInputCommand:
     CALL    Utils.PrintCRLF
     RET                                             ; Return to the previous address (outside of Monitor)
 
+Monitor.InputCommandError:
+    LD      HL, Monitor.InputCommandErrorString
+    JP      Utils.PrintString
+
+Monitor.InputCommandErrorString:
+    DB      " ?? Syntax Error, expected \"I port\"", $00
+
 ; -------------------------------------
 ; Data Read Command [R]
 ; - Syntax: R XXXX
@@ -475,11 +508,10 @@ Monitor.ProcessReadCommand:
 
 Monitor.ReadCommandError:
     LD      HL, Monitor.ReadCommandErrorString
-    SYSCALL SC_PrintString
-    RET
+    JP      Utils.PrintString
 
 Monitor.ReadCommandErrorString:
-    DB      " ?? Syntax Error, expected \"R hhll\"", $00
+    DB      " ?? Syntax Error, expected \"R addr\"", $00
 
 ; ----------------------------
 ; Intel HEX Reader Routines
@@ -637,3 +669,5 @@ Monitor.DataPrompt:
     DB      "\r\n     : ", $00
 Monitor.ErrorString:
     DB      "\r\n ?? Unknown Error", $00
+Monitor.UnknownCommandString:
+    DB      "\r\n ?? Unknown Command. 'H' for help.", $00
