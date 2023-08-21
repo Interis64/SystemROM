@@ -133,6 +133,10 @@ Monitor.ProcessInput:
     RET     Z
     LD      HL, Monitor.CommandBuffer
     LD      A, (HL)
+    CP      'H'
+    JP      Z, Monitor.ProcessHelpCommand
+    CP      'h'
+    JP      Z, Monitor.ProcessHelpCommand
     CP      'M'
     JP      Z, Monitor.ProcessMemoryEditorCommand
     CP      'm'
@@ -161,6 +165,13 @@ Monitor.ProcessInput:
     ; Unknown, so complain to the user and ask again
 Monitor.CommandError:
     LD      HL, Monitor.UnknownCommandString
+    JP      Utils.PrintString
+
+; -------------------------------------
+; Memory Editor Command [M addr]
+; -------------------------------------
+Monitor.ProcessHelpCommand:
+    LD      HL, Monitor.HelpText
     JP      Utils.PrintString
 
 ; -------------------------------------
@@ -671,3 +682,19 @@ Monitor.ErrorString:
     DB      "\r\n ?? Unknown Error", $00
 Monitor.UnknownCommandString:
     DB      "\r\n ?? Unknown Command. 'H' for help.", $00
+Monitor.HelpText:
+    DB      "\r\n\r\n"
+    DB      "Interis 64 ROM Monitor\r\n\r\n"
+    DB      "Commands:\r\n"
+    DB      "  M xxxx\r\n"
+    DB      "  - Start interactive memory editor\r\n"
+    DB      "    at address xxxx\r\n"
+    DB      "\r\n"
+    DB      "  X xxxx\r\n"
+    DB      "  - Start execution at address xxxx\r\n"
+    DB      "\r\n"
+    DB      "  R xxxx\r\n"
+    DB      "  - Read Intel HEX data from input\r\n"
+    DB      "  - Store starting at mem addr xxxx\r\n"
+    DB      "\r\n"
+    DB      $00
