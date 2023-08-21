@@ -67,16 +67,24 @@ Monitor.ControlLoop:
 ; Accept Input - Reads up to 16 bytes of ASCII from the user
 ; -------------------------------------
 Monitor.AcceptInput:
+    LD      B, Monitor.CommandBufferMax
+    XOR     A
+    LD      HL, Monitor.CommandBuffer               ; Point HL at the command buffer
+Monitor.ClearInputLoop:
+    LD      (HL), A
+    INC     HL
+    DJNZ    Monitor.ClearInputLoop
+
     LD      HL, Monitor.CommandPrompt               ; Print our prompt
     CALL    Utils.PrintString
     XOR     A                                       ; Zero out the length
     LD      (Monitor.CommandBufferLength), A        
     LD      HL, Monitor.CommandBuffer               ; Point HL at the command buffer
+Monitor.AcceptInputLoop:
     PUSH    AF
     LD      A, Syscall.ReadChar
     LD      (SyscallTarget), A
     POP     AF
-Monitor.AcceptInputLoop:
     RST     $10
 
     CP      '\n'                                    ; Ignore LF character
@@ -104,10 +112,6 @@ Monitor.AcceptInputLoop:
     LD      A, (Monitor.CommandBufferLength)        ; Increment our length counter
     INC     A
     LD      (Monitor.CommandBufferLength), A        
-    PUSH    AF
-    LD      A, Syscall.ReadChar
-    LD      (SyscallTarget), A
-    POP     AF
     JP      Monitor.AcceptInputLoop                 ; Wait for the next input
 
 Monitor.AcceptBackspace:
@@ -133,6 +137,9 @@ Monitor.ProcessInput:
     ; LD      A, '\n'
     ; RST     $10
     ; RST     $10
+    LD      A, (Monitor.CommandBufferLength)
+    CP      0
+    RET     Z
     LD      HL, Monitor.CommandBuffer
     LD      A, (HL)
     CP      'M'
@@ -162,7 +169,18 @@ Monitor.ProcessInput:
     ; Unknown, so complain to the user and ask again
 Monitor.CommandError:
     LD      HL, Monitor.ErrorString
-    JP      Utils.PrintString
+    CALL    Utils.PrintString
+    LD      HL, Monitor.CommandBuffer
+    LD      B, Monitor.CommandBufferMax
+    PUSH    AF
+    LD      A, $06
+    LD      ($FFFF), A
+    POP     AF
+Monitor.CommandErrorLoop:
+    RST     $10
+    INC     HL
+    DJNZ    Monitor.CommandErrorLoop
+    RET
 
 ; -------------------------------------
 ; Memory Editor Command [M addr]
