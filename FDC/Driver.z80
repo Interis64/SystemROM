@@ -383,7 +383,10 @@ ClearLoop2:
     ; Point the data buffer to our bootstrap location
     LD      HL, BootCodeAddress
     LD      (DataBuffer), HL
+    CALL    ResetFDC
     CALL    SelectDrive
+    CALL    Specify
+    CALL    Recalibrate
     CALL    Seek
     CALL    ReadSector
     CALL    DeselectDrives
