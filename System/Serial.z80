@@ -52,7 +52,7 @@ Serial.IRQHandler:
 
     IN      A, (Serial.CONTROL_PORT)
     AND     $01                                 ; Check if interupt due to read buffer full
-    JR      Z, Serial.IRQSkip                          ; if not, ignore
+    JR      Z, Serial.IRQSkip                   ; if not, ignore
 
     LD      A, Serial.RTS_HIGH
     OUT     (Serial.CONTROL_PORT), A
