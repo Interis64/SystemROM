@@ -201,7 +201,8 @@ Monitor.ME_PrintMemory:
     LD      A, '['
     SYSCALL SC_PrintChar
     LD      HL, (Monitor.DataStartAddress)  ; Get the address pointer
-    EX      DE, HL                          ; Swap to DE
+    PUSH    HL                              ; Copy to DE
+    POP     DE
     CALL    Monitor.PrintHexWord            ; Print address pointer
     LD      A, ']'
     SYSCALL SC_PrintChar
@@ -676,11 +677,11 @@ Monitor.HelpText:
     DB      "\r\n"
     DB      "\r\n"
     DB      "Interis 64 ROM Monitor Help\r\n"
-    DB      "--------------------------------------"
+    DB      "--------------------------------------\r\n"
     DB      "- M addr  | Start memory editor\r\n"
-    DB      "- X addr  | Start program at xxxx\r\n"
+    DB      "- X addr  | Start program at addr\r\n"
     DB      "- R addr  | Read Intel Hex data from\r\n"
-    DB      "          | input with offset xxxx\r\n"
+    DB      "          | input with offset addr\r\n"
     DB      "- Q       | Quit the monitor\r\n"
     DB      "--------------------------------------"
     DB      "\r\n"
