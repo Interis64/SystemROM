@@ -133,35 +133,25 @@ Monitor.ProcessInput:
     RET     Z
     LD      HL, Monitor.CommandBuffer
     LD      A, (HL)
+Monitor.ProcessInputLoop:
     CP      'H'
-    JP      Z, Monitor.ProcessHelpCommand
-    CP      'h'
     JP      Z, Monitor.ProcessHelpCommand
     CP      'M'
     JP      Z, Monitor.ProcessMemoryEditorCommand
-    CP      'm'
-    JP      Z, Monitor.ProcessMemoryEditorCommand
     CP      'X'
-    JP      Z, Monitor.ProcessExecuteCommand
-    CP      'x'
     JP      Z, Monitor.ProcessExecuteCommand
     CP      'D'
     JP      Z, Monitor.ProcessDumpCommand
-    CP      'd'
-    JP      Z, Monitor.ProcessDumpCommand
     CP      'I'
-    JP      Z, Monitor.ProcessInputCommand
-    CP      'i'
     JP      Z, Monitor.ProcessInputCommand
     CP      'O'
     JP      Z, Monitor.ProcessOutputCommand
-    CP      'o'
-    JP      Z, Monitor.ProcessOutputCommand
     CP      'Q'
     JP      Z, Monitor.ProcessQuitCommand
-    CP      'q'
-    JP      Z, Monitor.ProcessQuitCommand
-
+    CP      'a'                             ; Check if we're in lowercase range
+    JP      C, Monitor.CommandError         ; if not, we've got an error
+    SUB     $20                             ; If so, convert to uppercase
+    JP      Monitor.ProcessInputLoop        ; and try again
     ; Unknown, so complain to the user and ask again
 Monitor.CommandError:
     LD      HL, Monitor.UnknownCommandString
@@ -683,18 +673,15 @@ Monitor.ErrorString:
 Monitor.UnknownCommandString:
     DB      "\r\n ?? Unknown Command. 'H' for help.", $00
 Monitor.HelpText:
-    DB      "\r\n\r\n"
-    DB      "Interis 64 ROM Monitor\r\n\r\n"
-    DB      "Commands:\r\n"
-    DB      "  M xxxx\r\n"
-    DB      "  - Start interactive memory editor\r\n"
-    DB      "    at address xxxx\r\n"
     DB      "\r\n"
-    DB      "  X xxxx\r\n"
-    DB      "  - Start execution at address xxxx\r\n"
     DB      "\r\n"
-    DB      "  R xxxx\r\n"
-    DB      "  - Read Intel HEX data from input\r\n"
-    DB      "  - Store starting at mem addr xxxx\r\n"
+    DB      "Interis 64 ROM Monitor Help\r\n"
+    DB      "--------------------------------------"
+    DB      "- M addr  | Start memory editor\r\n"
+    DB      "- X addr  | Start program at xxxx\r\n"
+    DB      "- R addr  | Read Intel Hex data from\r\n"
+    DB      "          | input with offset xxxx\r\n"
+    DB      "- Q       | Quit the monitor\r\n"
+    DB      "--------------------------------------"
     DB      "\r\n"
     DB      $00
