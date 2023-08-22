@@ -148,6 +148,8 @@ Monitor.ProcessInputLoop:
     JP      Z, Monitor.ProcessOutputCommand
     CP      'Q'
     JP      Z, Monitor.ProcessQuitCommand
+    CP      'R'
+    JP      Z, Monitor.ProcessReadCommand
     CP      'a'                             ; Check if we're in lowercase range
     JP      C, Monitor.CommandError         ; if not, we've got an error
     SUB     $20                             ; If so, convert to uppercase
@@ -170,7 +172,7 @@ Monitor.ProcessHelpCommand:
 Monitor.ProcessMemoryEditorCommand:
     LD      A, (Monitor.CommandBufferLength) ; Check command length
     CP      6                               ; 6 bytes
-    JP      NZ, Monitor.CommandError
+    JP      NZ, Monitor.MemoryEditorCommandError
     LD      HL, Monitor.CommandBuffer+2
     CALL    Monitor.ReadHexWord
     EX      DE, HL
@@ -185,7 +187,7 @@ Monitor.MemoryEditorCommandError:
     JP      Utils.PrintString
 
 Monitor.MemoryEditorCommandErrorString:
-    DB      " ?? Syntax Error, expected \"M addr\"", $00
+    DB      "\r\n ?? Syntax Error, expected \"M addr\"", $00
 
 
 Monitor.ME_ControlLoop:
@@ -380,7 +382,7 @@ Monitor.ExecuteCommandError:
     JP      Utils.PrintString
 
 Monitor.ExecuteCommandErrorString:
-    DB      " ?? Syntax Error, expected \"X addr\"", $00
+    DB      "\r\n ?? Syntax Error, expected \"X addr\"", $00
 
 ; Note that we don't really expect to come back from where we jumped,
 ; but a RET from there will send us back into the monitor loop
@@ -424,7 +426,7 @@ Monitor.DumpCommandError:
     JP      Utils.PrintString
 
 Monitor.DumpCommandErrorString:
-    DB      " ?? Syntax Error, expected \"D addr size\"", $00
+    DB      "\r\n ?? Syntax Error, expected \"D addr size\"", $00
 
 ; -------------------------------------
 ; Quit command [Q]
@@ -442,7 +444,7 @@ Monitor.QuitCommandError:
     JP      Utils.PrintString
 
 Monitor.QuitCommandErrorString:
-    DB      " ?? Syntax Error, expected \"Q\"", $00
+    DB      "\r\n ?? Syntax Error, expected \"Q\"", $00
 
 
 ; -------------------------------------
@@ -506,6 +508,8 @@ Monitor.ProcessReadCommand:
     JP      NZ, Monitor.ReadCommandError    ; Not 6 bytes, so throw an error
     LD      HL, Monitor.CommandBuffer + 2   ; Advance to the command argument
     CALL    Monitor.ReadHexWord             ; Stores the argument in DE
+    LD      HL, Monitor.ReadCommandPrompt   ; Load the prompt string
+    SYSCALL SC_PrintString                  ; Print it
     JP      Monitor.IHX.ParseRecord         ; Go to the parsing routine
 
 Monitor.ReadCommandError:
@@ -513,18 +517,19 @@ Monitor.ReadCommandError:
     JP      Utils.PrintString
 
 Monitor.ReadCommandErrorString:
-    DB      " ?? Syntax Error, expected \"R addr\"", $00
+    DB      "\r\n ?? Syntax Error, expected \"R addr\"", $00
+Monitor.ReadCommandPrompt:
+    DB      "\r\n\r\n Waiting for data...\r\n\r\n", $00
 
 ; ----------------------------
 ; Intel HEX Reader Routines
 ; ----------------------------
 Monitor.IHX.ParseRecord:
     SYSCALL SC_ReadChar                ; Get next char from buffer
+    SYSCALL SC_PrintChar
     CP      ':'                             ; Check if it's a colon
     JP      NZ, Monitor.IHX.ParseRecord     ; If not, get the next char
     CALL    Monitor.IHX.ParseByte           ; Get the record length
-    CP      $00                             ; Check if this is a zero-length record
-    RET     Z                               ; If so, assume we're done (typical CP/M convention)
     LD      B, A                            ; Store into B
     CALL    Monitor.IHX.ParseByte           ; Get the destination address high byte
     LD      H, A                            ; Store into H
@@ -539,12 +544,19 @@ Monitor.IHX.DataReadLoop:
     LD      (HL), A                         ; Store at the address in HL
     INC     HL                              ; Next address
     DJNZ    Monitor.IHX.DataReadLoop        ; Go get the next byte
+    CALL    Monitor.IHX.ParseByte           ; Read checksum byte
+    LD      HL, Monitor.IHX.AcceptString
+    SYSCALL SC_PrintString
     JP      Monitor.IHX.ParseRecord         ; Done with this record, so get the next
+
+Monitor.IHX.AcceptString:
+    DB      "\r\n  -  Record Accepted  - \r\n", $00
 
 ; Read the current and next character, parse as hex digits, and store in A
 Monitor.IHX.ParseByte:
     PUSH    DE
     SYSCALL SC_ReadChar                ; Get next char from buffer
+    SYSCALL SC_PrintChar
     CALL    Monitor.IHX.ParseNibble
     ADD     A, A
     ADD     A, A
@@ -552,6 +564,7 @@ Monitor.IHX.ParseByte:
     ADD     A, A
     LD      D, A
     SYSCALL SC_ReadChar                ; Get next char from buffer
+    SYSCALL SC_PrintChar
     CALL    Monitor.IHX.ParseNibble
     OR      D
     POP     DE
