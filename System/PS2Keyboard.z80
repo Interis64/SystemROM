@@ -41,7 +41,7 @@ PS2Keyboard.Initialize:
 .WaitForKeyRelease:
     LD      A, (.Flags)
     BIT     .Flag_Released, A
-    JP      Z, .WaitForKeyRelease
+    JR      Z, .WaitForKeyRelease
     RES     .Flag_Released, A
     LD      (.Flags), A
     RET
@@ -68,23 +68,23 @@ PS2Keyboard.IRQHandler:
     JP      Z, .ProcAltKey
 
     CP      $84                             ; See if we're past the end of the scan code table
-    JP      NC, .IRQExit
+    JR      NC, .IRQExit
 
     LD      (.ScanCode), A
 
     LD      A, (.Flags)
     BIT     4, A
-    JP      Z, .AcceptKey
+    JR      Z, .AcceptKey
     RES     .Flag_Release, A                 ; Reset the KeyRelease flag
     SET     .Flag_Released, A                ; Reset the KeyReleased flag
     LD      (.Flags), A
-    JP      .IRQExit
+    JR      .IRQExit
 
 .AcceptKey:
     BIT     .Flag_Shift, A                   ; Test whether we're in a shift state
-    JP      NZ, .LoadShiftedTable
+    JR      NZ, .LoadShiftedTable
     LD      HL, ScanCodeTable.Lowercase
-    JP      .TranslateScanCode
+    JR      .TranslateScanCode
 .LoadShiftedTable:
     LD      HL, ScanCodeTable.Uppercase
 .TranslateScanCode:
@@ -99,7 +99,7 @@ PS2Keyboard.IRQHandler:
     PUSH    AF
     LD      A, (.Flags)
     BIT     .Flag_Ctrl, A
-    JP      Z, .SkipCtrl
+    JR      Z, .SkipCtrl
     POP     AF
     RES     6, A
     RES     5, A
@@ -122,15 +122,15 @@ PS2Keyboard.IRQHandler:
     LD      A, (.Flags)
     SET     .Flag_Release, A                 ; Set the KeyRelease flag
     LD      (.Flags), A
-    JP      .IRQExit
+    JR      .IRQExit
 
 .ProcShiftKey:
     LD      A, (.Flags)
     BIT     .Flag_Release, A
-    JP      NZ, .ProcShiftRelease
+    JR      NZ, .ProcShiftRelease
     SET     .Flag_Shift, A                   ; Set the Shift flag
     LD      (.Flags), A
-    JP      .IRQExit
+    JR      .IRQExit
 .ProcShiftRelease:
     RES     .Flag_Shift, A                   ; Clear the KeyRelease and Shift flags
     RES     .Flag_Release, A
@@ -140,28 +140,28 @@ PS2Keyboard.IRQHandler:
 .ProcCtrlKey:
     LD      A, (.Flags)
     BIT     .Flag_Release, A
-    JP      NZ, .ProcCtrlRelease
+    JR      NZ, .ProcCtrlRelease
     SET     .Flag_Ctrl, A
     LD      (.Flags), A
-    JP      .IRQExit
+    JR      .IRQExit
 .ProcCtrlRelease:
     RES     .Flag_Ctrl, A                    ; Clear the KeyRelease and Ctrl flags
     RES     .Flag_Release, A
     LD      (.Flags), A
-    JP      .IRQExit
+    JR      .IRQExit
 
 .ProcAltKey:
     LD      A, (.Flags)
     BIT     .Flag_Release, A
-    JP      NZ, .ProcAltRelease
+    JR      NZ, .ProcAltRelease
     SET     .Flag_Alt, A                     ; Set the Alt flag
     LD      (.Flags), A
-    JP      .IRQExit
+    JR      .IRQExit
 .ProcAltRelease:
     RES     .Flag_Alt, A                     ; Clear the KeyRelease and Ctrl flags
     RES     .Flag_Release, A
     LD      (.Flags), A
-    JP      .IRQExit
+    JR      .IRQExit
 
 .BUFFER_SIZE:      EQU   $3F
 .FULLSIZE:         EQU   .BUFFER_SIZE - $0F
@@ -205,30 +205,30 @@ PS2Keyboard.IRQHandler:
     RET
 
 PS2Keyboard.Read:
-      LD    A, (.BUFFER_USED)
-      CP    $00
-      JR    Z, PS2Keyboard.Read
-      PUSH  HL
-      LD    HL, (.RD_POINTER)
-      INC   HL
-      LD    A, L                                ; Only need to check low byte becasuse buffer<256 bytes
-      CP    (.BUFFER+.BUFFER_SIZE) & $FF
-      JR    NZ, .notRdWrap
-      LD    HL, .BUFFER
+    LD    A, (.BUFFER_USED)
+    CP    $00
+    JR    Z, PS2Keyboard.Read
+    PUSH  HL
+    LD    HL, (.RD_POINTER)
+    INC   HL
+    LD    A, L                                ; Only need to check low byte becasuse buffer<256 bytes
+    CP    (.BUFFER+.BUFFER_SIZE) & $FF
+    JR    NZ, .notRdWrap
+    LD    HL, .BUFFER
 .notRdWrap:
-      LD    (.RD_POINTER), HL
-      LD    A, (.BUFFER_USED)
-      DEC   A
-      LD    (.BUFFER_USED), A
-      LD    A, (HL)
-      POP   HL
-      RET                                       ; Char ready in A
+    LD    (.RD_POINTER), HL
+    LD    A, (.BUFFER_USED)
+    DEC   A
+    LD    (.BUFFER_USED), A
+    LD    A, (HL)
+    POP   HL
+    RET                                       ; Char ready in A
 
 ; ------------------------------------------------------------------------------
 PS2Keyboard.IsCharAvailable:
-      LD    A, (.BUFFER_USED)
-      CP    $00
-      RET
+    LD    A, (.BUFFER_USED)
+    CP    $00
+    RET
 
 
     INCLUDE "PS2ScanCodeTable.z80"
