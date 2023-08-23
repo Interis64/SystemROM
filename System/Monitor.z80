@@ -545,7 +545,7 @@ Monitor.Start:
     PUSH    DE
     SYSCALL SC_SerialRead                ; Get next char from buffer
     SYSCALL SC_PrintChar
-    CALL    .IHX.ParseNibble
+    CALL    .ReadHexNibble
     ADD     A, A
     ADD     A, A
     ADD     A, A
@@ -553,22 +553,10 @@ Monitor.Start:
     LD      D, A
     SYSCALL SC_SerialRead                ; Get next char from buffer
     SYSCALL SC_PrintChar
-    CALL    .IHX.ParseNibble
+    CALL    .ReadHexNibble
     OR      D
     POP     DE
     RET
-
-.IHX.ParseNibble:
-    CP      'a'
-    JR      C, .IHX.ParseNibbleUC
-    SUB     $20                             ; Convert Lowercase to Uppercase
-.IHX.ParseNibbleUC:
-    SUB     '0'
-    CP      $0A
-    RET     C
-    SUB     'A'-'0'-10
-    RET
-
 
 ; ------------------------------------------------------------------------------
 ; Hexadecimal I/O routines
