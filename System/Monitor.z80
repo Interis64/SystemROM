@@ -530,7 +530,7 @@ Monitor.Start:
     RET
 
 .IHX.AcceptString:
-    DB      "\r\n  -  Record Accepted  - \r\n", $00
+    DB      "\r\n", $00
 
 ; Read the current and next character, parse as hex digits, and store in A
 .IHX.ParseByte:
