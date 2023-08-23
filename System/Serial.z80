@@ -18,6 +18,16 @@
 .RTS_LOW:          EQU   10010110b
 .RTS_HIGH:         EQU   11010110b
 
+.BUFFER_SIZE:      EQU   $3F
+.FULLSIZE:         EQU   .BUFFER_SIZE - $0F
+.EMPTYSIZE:        EQU   $05
+
+.BUFFER:           DS    .BUFFER_SIZE
+.WR_POINTER:       DS    2
+.RD_POINTER:       DS    2
+.BUFFER_USED:      DS    1
+
+
 Serial.Initialize:
     ; Send 00000011 to Control Register for Master Reset
     ; Send 00000010 to Control Register for "clock div 64"
@@ -30,6 +40,13 @@ Serial.Initialize:
     ; Initialize the 6850 chip
     LD      A, .RTS_LOW
     OUT     (.CONTROL_PORT), A
+
+    ; Set up the input buffer
+    LD    HL, .BUFFER
+    LD    (.WR_POINTER),HL
+    LD    (.RD_POINTER),HL
+    XOR   A                          ; 0 to accumulator
+    LD    (.BUFFER_USED),A
 
     RET
 
@@ -44,6 +61,7 @@ Serial.TXA:
     POP     AF
     OUT     (.DATA_PORT), A          ; Write the character
     RET    
+; ------------------------------------------------------------------------------
 
 ; ------------------------------------------------------------------------------
 Serial.IRQHandler:
@@ -88,15 +106,8 @@ Serial.IRQHandler:
     POP     AF
     EI
     RETI
+; ------------------------------------------------------------------------------
 
-.BUFFER_SIZE:      EQU   $3F
-.FULLSIZE:         EQU   .BUFFER_SIZE - $0F
-.EMPTYSIZE:        EQU   $05
-
-.BUFFER:           DS    .BUFFER_SIZE
-.WR_POINTER:       DS    2
-.RD_POINTER:       DS    2
-.BUFFER_USED:      DS    1
 
 Serial.Read:
     LD      A, (.BUFFER_USED)
