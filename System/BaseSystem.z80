@@ -39,7 +39,6 @@ ColdBoot:
 WarmBoot:
     CALL    PS2Keyboard.Initialize
     CALL    Serial.Initialize
-    CALL    BufferedInput.Initialize
 
     ; Clear screen
     LD      A, SC_Beep
@@ -99,7 +98,6 @@ StartupMessage:
     DB "      https://github.com/Interis64\r\n"
     DB $00
 
-    INCLUDE "BufferedInput.z80"
     INCLUDE "PS2Keyboard.z80"
     INCLUDE "Serial.z80"
     INCLUDE "NVRAM.z80"

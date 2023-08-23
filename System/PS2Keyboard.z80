@@ -28,6 +28,14 @@ PS2Keyboard.Initialize:
     XOR     A
     LD      (.ScanCode), A
     LD      (.Flags), A
+
+    ; Set up the input buffer
+    LD    HL, .BUFFER
+    LD    (.WR_POINTER),HL
+    LD    (.RD_POINTER),HL
+    XOR   A                          ; 0 to accumulator
+    LD    (.BUFFER_USED),A
+
     RET
 
 .WaitForKeyRelease:
@@ -97,11 +105,9 @@ PS2Keyboard.IRQHandler:
     RES     5, A
     PUSH    AF
 .SkipCtrl:
-    LD      A, SC_InputAccept
-    LD      (SyscallTarget), A
     POP     AF
     CP      0
-    CALL    NZ, $0010                       ; Accept it if we have a nonzero character
+    CALL    NZ, .Accept                       ; Accept it if we have a nonzero character
 
 .IRQExit:
     XOR     A
@@ -157,8 +163,72 @@ PS2Keyboard.IRQHandler:
     LD      (.Flags), A
     JP      .IRQExit
 
-    INCLUDE "PS2ScanCodeTable.z80"
+.BUFFER_SIZE:      EQU   $3F
+.FULLSIZE:         EQU   .BUFFER_SIZE - $0F
+.EMPTYSIZE:        EQU   $05
+
+.BUFFER:           DS    .BUFFER_SIZE
+.WR_POINTER:       DS    2
+.RD_POINTER:       DS    2
+.BUFFER_USED:      DS    1
+
+; Accepts a byte into the buffer
+.Accept:
+    PUSH  AF
+    LD    A, (.BUFFER_USED)
+    CP    .BUFFER_SIZE                             ; If full then ignore
+    JR    NZ, .notFull
+    POP   AF
+    RET
+.notFull:
+    LD    HL, (.WR_POINTER)
+    INC   HL
+    LD    A, L                                ; Only need to check low byte becasuse buffer<256 bytes
+    CP    (.BUFFER+.BUFFER_SIZE) & $FF
+    JR    NZ, .notWrap
+    LD    HL, .BUFFER
+.notWrap:
+    LD    (.WR_POINTER), HL
+    POP   AF
+    LD    (HL), A
+    PUSH  AF
+    LD    A, (.BUFFER_USED)
+    INC   A
+    LD    (.BUFFER_USED), A
+    CP    .FULLSIZE
+    CALL  NC, .BufferFullAlert
+    POP   AF
+    RET
+
+.BufferFullAlert:
+    SYSCALL SC_Beep
+    RET
+
+PS2Keyboard.Read:
+      LD    A, (.BUFFER_USED)
+      CP    $00
+      JR    Z, PS2Keyboard.Read
+      PUSH  HL
+      LD    HL, (.RD_POINTER)
+      INC   HL
+      LD    A, L                                ; Only need to check low byte becasuse buffer<256 bytes
+      CP    (.BUFFER+.BUFFER_SIZE) & $FF
+      JR    NZ, .notRdWrap
+      LD    HL, .BUFFER
+.notRdWrap:
+      LD    (.RD_POINTER), HL
+      LD    A, (.BUFFER_USED)
+      DEC   A
+      LD    (.BUFFER_USED), A
+      LD    A, (HL)
+      POP   HL
+      RET                                       ; Char ready in A
 
 ; ------------------------------------------------------------------------------
-    ; ENDP
-; ------------------------------------------------------------------------------
+PS2Keyboard.IsCharAvailable:
+      LD    A, (.BUFFER_USED)
+      CP    $00
+      RET
+
+
+    INCLUDE "PS2ScanCodeTable.z80"

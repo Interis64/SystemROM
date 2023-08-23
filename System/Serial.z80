@@ -56,16 +56,78 @@ Serial.IRQHandler:
 
     LD      A, .RTS_HIGH
     OUT     (.CONTROL_PORT), A
+
     IN      A, (.DATA_PORT)
     PUSH    AF
-    LD      A, SC_SerialIn
-    LD      (SyscallTarget), A
+    LD      A, (.BUFFER_USED)
+    CP      .BUFFER_SIZE
+    JR      NZ, .NotFull
     POP     AF
-    RST     $10
-.IRQSkip:
-    LD      A, .RTS_LOW
+    JR      .IRQSkip
+
+.NotFull:
+    LD      HL, (.WR_POINTER)
+    INC     HL
+    LD      A, L
+    CP      (.BUFFER + .BUFFER_SIZE) & $FF
+    JR      NZ, .NotWrap
+    LD      HL, .BUFFER
+.NotWrap:
+    LD      (.WR_POINTER), HL
+    POP     AF
+    LD      (HL), A
+    LD      A, (.BUFFER_USED)
+    INC     A
+    LD      (.BUFFER_USED), A
+    CP      .FULLSIZE
+    JR      C, .IRQSkip
+    LD      A, .RTS_HIGH
     OUT     (.CONTROL_PORT), A
+.IRQSkip:
     POP     HL
     POP     AF
     EI
     RETI
+
+.BUFFER_SIZE:      EQU   $3F
+.FULLSIZE:         EQU   .BUFFER_SIZE - $0F
+.EMPTYSIZE:        EQU   $05
+
+.BUFFER:           DS    .BUFFER_SIZE
+.WR_POINTER:       DS    2
+.RD_POINTER:       DS    2
+.BUFFER_USED:      DS    1
+
+Serial.Read:
+    LD      A, (.BUFFER_USED)
+    CP      $00
+    JR      Z, Serial.Read
+    PUSH    HL
+    LD      HL, (.RD_POINTER)
+    INC     HL
+    LD      A, L             ; Only need to check low byte becasuse buffer<256 bytes
+    CP      (.BUFFER+.BUFFER_SIZE) & $FF
+    JR      NZ, .notRdWrap
+    LD      HL, .BUFFER
+.notRdWrap:      
+    DI
+    LD      (.RD_POINTER), HL
+    LD      A, (.BUFFER_USED)
+    DEC     A
+    LD      (.BUFFER_USED), A
+    CP      .EMPTYSIZE
+    JR      NC, .rts1
+    LD      A, .RTS_LOW
+    OUT     (.CONTROL_PORT), A
+.rts1:
+    LD      A,(HL)
+    EI
+    POP     HL
+    RET                      ; Char ready in A
+
+; ------------------------------------------------------------------------------
+Serial.IsCharAvailable:
+    LD    A, (.BUFFER_USED)
+    CP    $00
+    RET
+

@@ -14,13 +14,10 @@ SC_PrintString:    EQU $08
     DW  Utils.PrintString                   ; $08 - Print null-terminated string to output device
 
 SC_ReadChar:       EQU $0A
-    DW  BufferedInput.Read                  ; $0A - Read a character from BufferedInput
+    DW  PS2Keyboard.Read                    ; $0A - Read a character from BufferedInput
 
 SC_InputReady:     EQU $0C
-    DW  BufferedInput.IsCharAvailable       ; $0C - Check if there's a character available in BufferedInput
-
-SC_InputAccept:    EQU $0E
-    DW  BufferedInput.Accept                ; $0E - Write a character into the input buffer
+    DW  PS2Keyboard.IsCharAvailable         ; $0C - Check if there's a character available in BufferedInput
 
 SC_Beep:           EQU $10
     DW  NVRAM.Beep                          ; $10 - System Bell
@@ -31,15 +28,18 @@ SC_NVRAMRead:      EQU $12
 SC_NVRAMWrite:     EQU $14
     DW  NVRAM.Write                         ; $14 - NVRAM Write Byte
 
-SC_SerialOut:       EQU $16
+SC_SerialWrite:    EQU $16
     DW  Serial.TXA                          ; $16 - Serial Transmit Byte
 
-SC_SerialIn:       EQU $18
-    DW  BufferedInput.Accept                ; $18 - Serial Receive Byte
+SC_SerialRead:     EQU $18
+    DW  Serial.Read                ; $18 - Serial Receive Byte
 
-SC_ReadBlock:      EQU $1A
+SC_SerialReady:    EQU $1A
+    DW  Serial.Read                ; $18 - Serial Receive Byte
+
+SC_ReadBlock:      EQU $1C
     DW  SyscallNOP                          ; $1A - Read Block from storage device
 
-SC_WriteBlock:     EQU $1C
+SC_WriteBlock:     EQU $1E
     DW  SyscallNOP                          ; $1A - Write Block to storage device
 
