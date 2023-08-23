@@ -16,15 +16,15 @@
 ; 300 RPM, 500 kbps
 ; ------------------------------------------------------------------------------
 
-FDC.InitInstalled:      EQU ScratchPad               ; temporary "installed" flag for init use only
+.InitInstalled:      EQU ScratchPad               ; temporary "installed" flag for init use only
 
 FDC.Initialize:
     ; Clear the installed flag (this will be set based on tests later in the init routine)
     LD      A, $00
-    LD      (FDC.InitInstalled), A
+    LD      (.InitInstalled), A
 
-    CALL    FDC.LookForCard
-    LD      A, (FDC.InitInstalled)
+    CALL    .LookForCard
+    LD      A, (.InitInstalled)
     CP      $00                             ; Check if the card is not installed
     RET     Z                               ; Bail out if card is not installed
 
@@ -33,7 +33,7 @@ FDC.Initialize:
     LD      HL, FDCDriverStart                      ; Set the driver source address
     LDIR
 
-    CALL    FDC.SetupIOAddr
+    CALL    .SetupIOAddr
     CALL    FDCDriver.ResetFDC
     XOR     A
     LD      (FDCDriver.DriveNumber), A
@@ -50,12 +50,12 @@ FDC.Initialize:
 
     RET
 
-FDC.LookForCard:
+.LookForCard:
     LD      A, $01
-    LD      (FDC.InitInstalled), A
+    LD      (.InitInstalled), A
     RET
 
-FDC.SetupIOAddr:
+.SetupIOAddr:
     LD      A, SLOT7
     LD      (FDCDriver.SLOT), A
 

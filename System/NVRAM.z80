@@ -10,185 +10,185 @@
 ; Licensed under the GNU GPL 3.0. See the LICENSE file for details.
 ; ------------------------------------------------------------------------------
 
-NVRAM.SLOT:           EQU SLOT3			        ; NVRAM is on-board at SLOT 3
-NVRAM.PORT_ADDR:      EQU NVRAM.SLOT
-NVRAM.PORT_DATA:      EQU NVRAM.SLOT + $01
+.SLOT:           EQU SLOT3			        ; NVRAM is on-board at SLOT 3
+.PORT_ADDR:      EQU .SLOT
+.PORT_DATA:      EQU .SLOT + $01
 
-NVRAM.INT_VECTOR:     EQU $8150                   ; Programmable interrupt routine
+.INT_VECTOR:     EQU $8150                   ; Programmable interrupt routine
 
 ; ------------------------------
 ; Memory Locations
 ; ------------------------------
-NVRAM.CONTROL_A:      EQU $0A
-NVRAM.CONTROL_B:      EQU $0B
-NVRAM.CONTROL_C:      EQU $0C
-NVRAM.CONTROL_D:      EQU $0D
+.CONTROL_A:      EQU $0A
+.CONTROL_B:      EQU $0B
+.CONTROL_C:      EQU $0C
+.CONTROL_D:      EQU $0D
 
-NVRAM.SECONDS:        EQU $00
-NVRAM.MINUTES:        EQU $02
-NVRAM.HOURS:          EQU $04
+.SECONDS:        EQU $00
+.MINUTES:        EQU $02
+.HOURS:          EQU $04
 
-NVRAM.DAY_OF_WEEK:    EQU $06
-NVRAM.DATE:           EQU $07
-NVRAM.MONTH:          EQU $08
-NVRAM.YEAR:           EQU $09
+.DAY_OF_WEEK:    EQU $06
+.DATE:           EQU $07
+.MONTH:          EQU $08
+.YEAR:           EQU $09
 
-NVRAM.GP_NVRAM:       EQU $0E
-NVRAM.GP_LENGTH:      EQU $71
-NVRAM.CHECKSUM_LOC:   EQU $7F
+.GP_NVRAM:       EQU $0E
+.GP_LENGTH:      EQU $71
+.CHECKSUM_LOC:   EQU $7F
 
 ; Configuration NVRAM Locations
-NVRAM.TMS9918A_SLOT:  EQU $14
-NVRAM.OPL2_SLOT:      EQU $15
-NVRAM.DISK_SLOT:      EQU $16
+.TMS9918A_SLOT:  EQU $14
+.OPL2_SLOT:      EQU $15
+.DISK_SLOT:      EQU $16
 
-NVRAM.Defaults.REG_A: EQU 00100111b                        ; Enable oscillator, set square wave freq 1024Hz
-NVRAM.Defaults.REG_B: EQU 00000111b                        ; No interrupts, No square wave, binary datetime, 24-hour, DST on
+.Defaults.REG_A: EQU 00100111b                        ; Enable oscillator, set square wave freq 1024Hz
+.Defaults.REG_B: EQU 00000111b                        ; No interrupts, No square wave, binary datetime, 24-hour, DST on
 
 ; ------------------------------
 
-NVRAM.Initialize:
-    LD      A, NVRAM.Defaults.REG_A
+.Initialize:
+    LD      A, .Defaults.REG_A
     LD      B, $0A
-    CALL    NVRAM.WriteRaw
-    LD      A, NVRAM.Defaults.REG_B
+    CALL    .WriteRaw
+    LD      A, .Defaults.REG_B
     LD      B, $0B
-    JP      NVRAM.WriteRaw
+    JP      .WriteRaw
 
 NVRAM.Beep:
-    LD      C, NVRAM.PORT_ADDR
+    LD      C, .PORT_ADDR
     LD      B, $0B
     OUT     (C), B
-    LD      C, NVRAM.PORT_DATA
+    LD      C, .PORT_DATA
     ; IN      B, (C)
     ; SET     3, B
     LD      B, 00001111b
     OUT     (C), B
 
     LD	    B, $80
-NVRAM.BeepWaitLoop:
+.BeepWaitLoop:
     PUSH	BC
     LD	    B, $00
     DJNZ	$
     POP	    BC
-    DJNZ	NVRAM.BeepWaitLoop
+    DJNZ	.BeepWaitLoop
 
-    LD      C, NVRAM.PORT_ADDR
+    LD      C, .PORT_ADDR
     LD      B, $0A
     OUT     (C), B
-    LD      C, NVRAM.PORT_DATA
+    LD      C, .PORT_DATA
     LD      B, 00100110b
     OUT     (C), B
 
     LD	    B, $80
-NVRAM.BeepWaitLoop2:
+.BeepWaitLoop2:
     PUSH	BC
     LD	    B, $00
     DJNZ	$
     POP	    BC
-    DJNZ	NVRAM.BeepWaitLoop2
+    DJNZ	.BeepWaitLoop2
 
     ; RES     3, B
-    LD      C, NVRAM.PORT_ADDR
+    LD      C, .PORT_ADDR
     LD      B, $0B
     OUT     (C), B
-    LD      C, NVRAM.PORT_DATA
+    LD      C, .PORT_DATA
     LD      B, 00000111b
     OUT     (C), B
     RET
 
-NVRAM.IRQHandler:
+.IRQHandler:
     PUSH    AF
     IN      A, ($0B)
     POP     AF
     EI
     RETI
 
-NVRAM.SetAlarm:
+.SetAlarm:
     RET
 
-NVRAM.Delay:
+.Delay:
     RET
 
 ; Calculates the checksum of the NVRAM data
 ; Returns the value in A
-NVRAM.ComputeChecksum:
+.ComputeChecksum:
     PUSH	BC
     PUSH	HL
     XOR     A
-    LD      L, NVRAM.GP_NVRAM
-    LD      B, NVRAM.GP_LENGTH
-NVRAM.ChecksumLoop:
-    LD      C, NVRAM.PORT_ADDR
+    LD      L, .GP_NVRAM
+    LD      B, .GP_LENGTH
+.ChecksumLoop:
+    LD      C, .PORT_ADDR
     OUT     (C), L
-    LD		C, NVRAM.PORT_DATA
+    LD		C, .PORT_DATA
     IN      H, (C)
     XOR     H
     INC     L
-    DJNZ    NVRAM.ChecksumLoop
+    DJNZ    .ChecksumLoop
     POP	    HL
     POP	    BC
     RET
 
-NVRAM.UpdateChecksum:
+.UpdateChecksum:
     PUSH	AF
     PUSH	BC
 
     LD      B, $7C
     LD      A, 'I'
-    CALL    NVRAM.WriteRaw
+    CALL    .WriteRaw
 
     LD      B, $7D
     LD      A, '6'
-    CALL    NVRAM.WriteRaw
+    CALL    .WriteRaw
 
     LD      B, $7E
     LD      A, '4'
-    CALL    NVRAM.WriteRaw
+    CALL    .WriteRaw
 
-    CALL    NVRAM.ComputeChecksum
+    CALL    .ComputeChecksum
     LD      B, $7F
-    CALL    NVRAM.WriteRaw
+    CALL    .WriteRaw
     
     POP	    BC
     POP	    AF
     RET
 
-NVRAM.WaitForUpdate:
+.WaitForUpdate:
     PUSH    BC
 
-    LD      C, NVRAM.PORT_ADDR
+    LD      C, .PORT_ADDR
     LD      B, $A0
     OUT     (C), B
 
-    LD      C, NVRAM.PORT_DATA
-NVRAM.WaitForUpdateLoop:
+    LD      C, .PORT_DATA
+.WaitForUpdateLoop:
     IN      B, (C)
     BIT     7, B
-    JP      Z, NVRAM.WaitForUpdateLoop
+    JP      Z, .WaitForUpdateLoop
 
     POP     BC
     RET
 
-NVRAM.WriteRaw: ; Writes the data in regA to the address in regB
-    CALL    NVRAM.WaitForUpdate
+.WriteRaw: ; Writes the data in regA to the address in regB
+    CALL    .WaitForUpdate
     PUSH    BC
-    LD      C, NVRAM.PORT_ADDR
+    LD      C, .PORT_ADDR
     OUT     (C), B
-    LD      C, NVRAM.PORT_DATA
+    LD      C, .PORT_DATA
     OUT     (C), A
     POP     BC
     RET
 
 NVRAM.Write: ; Writes the data in regA to the address in regB and updates the checksum
-    CALL    NVRAM.WriteRaw
-    JP      NVRAM.UpdateChecksum
+    CALL    .WriteRaw
+    JP      .UpdateChecksum
 
 NVRAM.Read: ; Reads the data from address in regB into regA
     PUSH    BC
-    LD      C, NVRAM.PORT_ADDR
+    LD      C, .PORT_ADDR
     OUT     (C), B
-    LD      C, NVRAM.PORT_DATA
+    LD      C, .PORT_DATA
     IN      A, (C)
     POP     BC
     RET
@@ -198,7 +198,7 @@ NVRAM.Read: ; Reads the data from address in regB into regA
 ; Converts that to an IO base address.
 ; Returns that address in A.
 ; Returns $FF if card not installed.
-NVRAM.GetIOPort:
+.GetIOPort:
     LD      B, A
     CALL    NVRAM.Read
     CP      $FF
@@ -210,29 +210,29 @@ NVRAM.GetIOPort:
     SLA     A
     RET
 
-NVRAM.ValidateChecksum:
+.ValidateChecksum:
     PUSH	BC
     LD      B, $7C
     CALL    NVRAM.Read
     CP      'I'
-    JP      NZ, NVRAM.ValidateChecksumReturn      ; Return with the zero flag not set
+    JP      NZ, .ValidateChecksumReturn      ; Return with the zero flag not set
 
     LD      B, $7D
     CALL    NVRAM.Read
     CP      '6'
-    JP      NZ, NVRAM.ValidateChecksumReturn      ; Return with the zero flag not set
+    JP      NZ, .ValidateChecksumReturn      ; Return with the zero flag not set
 
     LD      B, $7E
     CALL    NVRAM.Read
     CP      '4'                             ; Check for a match
-    JP      NZ, NVRAM.ValidateChecksumReturn      ; Return with the zero flag not set
+    JP      NZ, .ValidateChecksumReturn      ; Return with the zero flag not set
 
-    LD      B, NVRAM.CHECKSUM_LOC
+    LD      B, .CHECKSUM_LOC
     CALL    NVRAM.Read
     LD      B, A
-    CALL    NVRAM.ComputeChecksum                 ; Calculate what the checksum SHOULD be
+    CALL    .ComputeChecksum                 ; Calculate what the checksum SHOULD be
     CP      B                               ; Compare to the actual value
-NVRAM.ValidateChecksumReturn:
+.ValidateChecksumReturn:
     POP	    BC
     RET                                     ; Return with the compare result flags set
  

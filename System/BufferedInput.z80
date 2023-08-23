@@ -10,77 +10,74 @@
 ; Copyright 2023 Matthew Martin
 ; Licensed under the GNU GPL 3.0. See the LICENSE file for details.
 ; ------------------------------------------------------------------------------
-; BufferedInput:      PROC
 
-BufferedInput.BUFFER_SIZE:      EQU   $3F
-BufferedInput.FULLSIZE:         EQU   BufferedInput.BUFFER_SIZE - $0F
-BufferedInput.EMPTYSIZE:        EQU   $05
+.BUFFER_SIZE:      EQU   $3F
+.FULLSIZE:         EQU   .BUFFER_SIZE - $0F
+.EMPTYSIZE:        EQU   $05
 
-BufferedInput.BUFFER:           DS    BufferedInput.BUFFER_SIZE
-BufferedInput.WR_POINTER:       DS    2
-BufferedInput.RD_POINTER:       DS    2
-BufferedInput.BUFFER_USED:      DS    1
+.BUFFER:           DS    .BUFFER_SIZE
+.WR_POINTER:       DS    2
+.RD_POINTER:       DS    2
+.BUFFER_USED:      DS    1
 
 BufferedInput.Initialize:
       ; Set up the input buffer
-      LD    HL, BufferedInput.BUFFER
-      LD    (BufferedInput.WR_POINTER),HL
-      LD    (BufferedInput.RD_POINTER),HL
+      LD    HL, .BUFFER
+      LD    (.WR_POINTER),HL
+      LD    (.RD_POINTER),HL
       XOR   A                                   ;0 to accumulator
-      LD    (BufferedInput.BUFFER_USED),A
+      LD    (.BUFFER_USED),A
       RET
 
 ; Accepts a byte into the buffer
 BufferedInput.Accept:
       PUSH  AF
-      LD    A, (BufferedInput.BUFFER_USED)
-      CP    BufferedInput.BUFFER_SIZE                             ; If full then ignore
-      JR    NZ, BufferedInput.notFull
+      LD    A, (.BUFFER_USED)
+      CP    .BUFFER_SIZE                             ; If full then ignore
+      JR    NZ, .notFull
       POP   AF
       RET
-BufferedInput.notFull:
-      LD    HL, (BufferedInput.WR_POINTER)
+.notFull:
+      LD    HL, (.WR_POINTER)
       INC   HL
       LD    A, L                                ; Only need to check low byte becasuse buffer<256 bytes
-      CP    (BufferedInput.BUFFER+BufferedInput.BUFFER_SIZE) & $FF
-      JR    NZ, BufferedInput.notWrap
-      LD    HL, BufferedInput.BUFFER
-BufferedInput.notWrap:
-      LD    (BufferedInput.WR_POINTER), HL
+      CP    (.BUFFER+.BUFFER_SIZE) & $FF
+      JR    NZ, .notWrap
+      LD    HL, .BUFFER
+.notWrap:
+      LD    (.WR_POINTER), HL
       POP   AF
       LD    (HL), A
       PUSH  AF
-      LD    A, (BufferedInput.BUFFER_USED)
+      LD    A, (.BUFFER_USED)
       INC   A
-      LD    (BufferedInput.BUFFER_USED), A
-      CP    BufferedInput.FULLSIZE
+      LD    (.BUFFER_USED), A
+      CP    .FULLSIZE
       POP   AF
       RET
 
 BufferedInput.Read:
-      LD    A, (BufferedInput.BUFFER_USED)
+      LD    A, (.BUFFER_USED)
       CP    $00
       JR    Z, BufferedInput.Read
       PUSH  HL
-      LD    HL, (BufferedInput.RD_POINTER)
+      LD    HL, (.RD_POINTER)
       INC   HL
       LD    A, L                                ; Only need to check low byte becasuse buffer<256 bytes
-      CP    (BufferedInput.BUFFER+BufferedInput.BUFFER_SIZE) & $FF
-      JR    NZ, BufferedInput.notRdWrap
-      LD    HL, BufferedInput.BUFFER
-BufferedInput.notRdWrap:
-      LD    (BufferedInput.RD_POINTER), HL
-      LD    A, (BufferedInput.BUFFER_USED)
+      CP    (.BUFFER+.BUFFER_SIZE) & $FF
+      JR    NZ, .notRdWrap
+      LD    HL, .BUFFER
+.notRdWrap:
+      LD    (.RD_POINTER), HL
+      LD    A, (.BUFFER_USED)
       DEC   A
-      LD    (BufferedInput.BUFFER_USED), A
+      LD    (.BUFFER_USED), A
       LD    A, (HL)
       POP   HL
       RET                                       ; Char ready in A
 
 ; ------------------------------------------------------------------------------
 BufferedInput.IsCharAvailable:
-      LD    A, (BufferedInput.BUFFER_USED)
+      LD    A, (.BUFFER_USED)
       CP    $00
       RET
-
-      ; ENDP

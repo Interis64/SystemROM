@@ -15,18 +15,18 @@
 ; ------------------------------------------------------------------------------
 
 ; Temporary variables
-VDP.InitInstalled:      EQU ScratchPad
-VDP.InitControlPort:    EQU ScratchPad + 1
-VDP.InitDataPort:       EQU ScratchPad + 2
-VDP.HardwareID:         EQU $10
+.InitInstalled:      EQU ScratchPad
+.InitControlPort:    EQU ScratchPad + 1
+.InitDataPort:       EQU ScratchPad + 2
+.HardwareID:         EQU $10
 
 VDP.Initialize:
     ; Clear the installed flag (this will be set based on tests later in the init routine)
     LD      A, $00
-    LD      (VDP.InitInstalled), A
+    LD      (.InitInstalled), A
 
-    CALL    VDP.LookForCard
-    LD      A, (VDP.InitInstalled)
+    CALL    .LookForCard
+    LD      A, (.InitInstalled)
     CP      $00                                     ; Check if the card is not installed
     RET     Z                                       ; Bail out if card is not installed
 
@@ -41,7 +41,7 @@ VDP.Initialize:
 
     ; Set the hardware ID byte for the corresponding slot
     LD      HL, SLOT4HardwareID - 4
-    LD      A, (VDP.InitDataPort)
+    LD      A, (.InitDataPort)
     SRL     A                                       ; Shift the IO address to get a slot number
     SRL     A
     SRL     A
@@ -49,12 +49,12 @@ VDP.Initialize:
     SRL     A
     ADD     A, L                                    ; Point to the slot's Hardware ID address
     LD      L, A
-    LD      (HL), VDP.HardwareID                    ; Load our Hardware ID
+    LD      (HL), .HardwareID                    ; Load our Hardware ID
 
     ; Copy I/O addresses to the driver
-    LD      A, (VDP.InitControlPort)
+    LD      A, (.InitControlPort)
     LD      (VDPDriver.ControlPort), A
-    LD      A, (VDP.InitDataPort)
+    LD      A, (.InitDataPort)
     LD      (VDPDriver.DataPort), A
 
     LD      A, $FF                                  ; Set the default cursor character
@@ -134,9 +134,9 @@ VDP.Initialize:
 
     RET
 
-VDP.LookForCard:
+.LookForCard:
     LD      A, $80                          ; Start looking at base address 0x80
-VDP.LookForCardLoop:
+.LookForCardLoop:
     PUSH    HL                                  ; Check if there's an existing Hardware ID for that slot
     PUSH    AF
     SRL     A                                   ; Shift the IO address to get a slot number
@@ -149,65 +149,65 @@ VDP.LookForCardLoop:
     LD      A, (HL)                             ; Load our Hardware ID
     POP     HL
     CP      $00
-    JP      NZ, VDP.LookForCard.SlotOccupied    ; If there's a Hardware ID, skip this and go to the next
+    JP      NZ, .LookForCard.SlotOccupied    ; If there's a Hardware ID, skip this and go to the next
     POP     AF
 
-    LD      (VDP.InitDataPort), A           ; Store base address as data port
+    LD      (.InitDataPort), A           ; Store base address as data port
     INC     A
-    LD      (VDP.InitControlPort), A        ; Store base address + 1 as control port
+    LD      (.InitControlPort), A        ; Store base address + 1 as control port
 
     PUSH    AF
-    CALL    VDP.CheckCardExists             ; Writes and reads back some VRAM to validate the card
-    JP      Z, VDP.FoundCard
+    CALL    .CheckCardExists             ; Writes and reads back some VRAM to validate the card
+    JP      Z, .FoundCard
 
-VDP.LookForCard.SlotOccupied:
+.LookForCard.SlotOccupied:
     POP     AF
 
     CP      $E1                             ; Check if we've looked in all four slots
     RET     NC                              ; If so, we're done, no card found
     ADD     A, $1F                          ; If not, move to the next slot...
-    JP      VDP.LookForCardLoop             ; and do the check again
+    JP      .LookForCardLoop             ; and do the check again
 
-VDP.FoundCard:
+.FoundCard:
     LD      A, $01
-    LD      (VDP.InitInstalled), A
+    LD      (.InitInstalled), A
     POP     AF
     RET
 
 
-VDP.CheckCardExists:
+.CheckCardExists:
     LD      DE, $1400
     LD      A, $00
-    CALL    VDP.InitWriteVRAM
-    CALL    VDP.InitReadVRAM
+    CALL    .InitWriteVRAM
+    CALL    .InitReadVRAM
     CP      $00
     RET     NZ                              ; Values don't match, so bail
 
     LD      DE, $1400
     LD      A, $55
-    CALL    VDP.InitWriteVRAM
-    CALL    VDP.InitReadVRAM
+    CALL    .InitWriteVRAM
+    CALL    .InitReadVRAM
     CP      $55
     RET     NZ                              ; Values don't match, so bail
 
     LD      DE, $1400
     LD      A, $AA
-    CALL    VDP.InitWriteVRAM
-    CALL    VDP.InitReadVRAM
+    CALL    .InitWriteVRAM
+    CALL    .InitReadVRAM
     CP      $AA
     RET     NZ                              ; Values don't match, so bail
 
     LD      DE, $1400
     LD      A, $FF
-    CALL    VDP.InitWriteVRAM
-    CALL    VDP.InitReadVRAM
+    CALL    .InitWriteVRAM
+    CALL    .InitReadVRAM
     CP      $FF
     RET
 
 ; Writes the data in A to VDP register number B
-VDP.InitWriteRegister:
+.InitWriteRegister:
     PUSH    AF
-    LD      A, (VDP.InitControlPort)
+    LD      A, (.InitControlPort)
     LD      C, A
     POP     AF
     OUT     (C), A
@@ -218,10 +218,10 @@ VDP.InitWriteRegister:
     RET
 
 ; Writes A to the VRAM location DE
-VDP.InitWriteVRAM:
+.InitWriteVRAM:
     PUSH    BC
     PUSH    AF
-    LD      A, (VDP.InitControlPort)
+    LD      A, (.InitControlPort)
     LD      C, A
 	LD      A, E
 	OUT     (C), A
@@ -229,7 +229,7 @@ VDP.InitWriteVRAM:
 	AND     00111111b
 	OR      01000000b
 	OUT     (C), A
-    LD      A, (VDP.InitDataPort)
+    LD      A, (.InitDataPort)
     LD      C, A
 	POP     AF
 	OUT     (C), A
@@ -237,16 +237,16 @@ VDP.InitWriteVRAM:
     RET
 
 ; Reads A from the VRAM location DE
-VDP.InitReadVRAM:
+.InitReadVRAM:
     PUSH    BC
-    LD      A, (VDP.InitControlPort)
+    LD      A, (.InitControlPort)
     LD      C, A
 	LD      A, E
 	OUT     (C), A
 	LD      A, D
 	AND     00111111b
 	OUT     (C), A
-    LD      A, (VDP.InitDataPort)
+    LD      A, (.InitDataPort)
     LD      C, A
 	IN      A, (C)
     POP     BC
