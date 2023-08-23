@@ -495,12 +495,19 @@ Monitor.Start:
 .ReadCommandErrorString:
     DB      "\r\n ?? Syntax Error, expected \"R addr\"", $00
 .ReadCommandPrompt:
-    DB      "\r\n\r\n Waiting for data...\r\n\r\n", $00
+    DB      "\r\n\r\n Waiting for serial data...\r\n Press ESC to cancel.\r\n\r\n", $00
 
 ; ----------------------------
 ; Intel HEX Reader Routines
 ; ----------------------------
 .IHX.ParseRecord:
+    SYSCALL SC_InputReady
+    JP      Z, .IHX.ParseRecord.CheckSerial
+    CALL    .IHX.CheckCancel
+    RET     Z
+.IHX.ParseRecord.CheckSerial:
+    SYSCALL SC_SerialReady
+    JP      Z, .IHX.ParseRecord
     SYSCALL SC_SerialRead                ; Get next char from buffer
     SYSCALL SC_PrintChar
     CP      ':'                             ; Check if it's a colon
@@ -524,6 +531,11 @@ Monitor.Start:
     LD      HL, .IHX.AcceptString
     SYSCALL SC_PrintString
     JP      .IHX.ParseRecord         ; Done with this record, so get the next
+
+.IHX.CheckCancel:
+    SYSCALL SC_ReadChar
+    CP      $1B                      ; Is this an ESC char?
+    RET
 
 .IHX.AcceptString:
     DB      "\r\n  -  Record Accepted  - \r\n", $00
