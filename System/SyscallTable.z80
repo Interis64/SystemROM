@@ -19,6 +19,9 @@ SC_ReadChar:       EQU $0A
 SC_InputReady:     EQU $0C
     DW  PS2Keyboard.IsCharAvailable         ; $0C - Check if there's a character available in BufferedInput
 
+SC_Unused:            EQU $0E
+    DW  SyscallNOP
+
 SC_Beep:           EQU $10
     DW  NVRAM.Beep                          ; $10 - System Bell
 
@@ -35,11 +38,11 @@ SC_SerialRead:     EQU $18
     DW  Serial.Read                ; $18 - Serial Receive Byte
 
 SC_SerialReady:    EQU $1A
-    DW  Serial.Read                ; $18 - Serial Receive Byte
+    DW  Serial.IsCharAvailable                ; $1A - Serial Receive Byte
 
 SC_ReadBlock:      EQU $1C
-    DW  SyscallNOP                          ; $1A - Read Block from storage device
+    DW  SyscallNOP                          ; $1C - Read Block from storage device
 
 SC_WriteBlock:     EQU $1E
-    DW  SyscallNOP                          ; $1A - Write Block to storage device
+    DW  SyscallNOP                          ; $1E - Write Block to storage device
 
