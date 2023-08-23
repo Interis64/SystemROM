@@ -24,21 +24,6 @@
 .DataStartAddress:       DS  2                                   ; Memory location for the Memory Editor start address
 .DataBuffer:             DS  .DataBufferMax               ; Memory location for the data buffer (23 bytes)
 
-; If we got here from a non-maskable interrupt, then we'll swap out the registers
-; so we don't clobber the running program. When the Monitor exits, we
-; swap them back and give control back.
-.NMIHandler:
-    EX      AF, AF'
-    EXX
-
-    ; Call instead of jump, so we put this return address on the stack
-    CALL    .ControlLoop
-    
-    ; When the user quits the monitor, we'll pick up here
-    EXX
-    EX      AF, AF'
-    RETN
-
 ; If we got here from an external call, then we'll swap out the registers
 ; so we don't clobber the running program. When the Monitor exits, we
 ; swap them back and give control back.
@@ -134,8 +119,6 @@ Monitor.Start:
     LD      HL, .CommandBuffer
     LD      A, (HL)
 .ProcessInputLoop:
-    CP      'H'
-    JP      Z, .ProcessHelpCommand
     CP      'M'
     JP      Z, .ProcessMemoryEditorCommand
     CP      'X'
@@ -157,13 +140,6 @@ Monitor.Start:
     ; Unknown, so complain to the user and ask again
 .CommandError:
     LD      HL, .UnknownCommandString
-    JP      Utils.PrintString
-
-; -------------------------------------
-; Memory Editor Command [M addr]
-; -------------------------------------
-.ProcessHelpCommand:
-    LD      HL, .HelpText
     JP      Utils.PrintString
 
 ; -------------------------------------
@@ -234,7 +210,7 @@ Monitor.Start:
     CALL    Utils.PrintString
     LD      HL, .DataBuffer          ; Point HL at the data buffer
 .ME_AcceptInputLoop:
-    CALL    BufferedInput.Read
+    SYSCALL SC_ReadChar
     CP      '\r'                            ; CR completes input
     RET     Z                               ; So return out of the input loop
     CP      $08                             ; Ignore LF character
@@ -525,7 +501,7 @@ Monitor.Start:
 ; Intel HEX Reader Routines
 ; ----------------------------
 .IHX.ParseRecord:
-    SYSCALL SC_ReadChar                ; Get next char from buffer
+    SYSCALL SC_SerialRead                ; Get next char from buffer
     SYSCALL SC_PrintChar
     CP      ':'                             ; Check if it's a colon
     JP      NZ, .IHX.ParseRecord     ; If not, get the next char
@@ -555,7 +531,7 @@ Monitor.Start:
 ; Read the current and next character, parse as hex digits, and store in A
 .IHX.ParseByte:
     PUSH    DE
-    SYSCALL SC_ReadChar                ; Get next char from buffer
+    SYSCALL SC_SerialRead                ; Get next char from buffer
     SYSCALL SC_PrintChar
     CALL    .IHX.ParseNibble
     ADD     A, A
@@ -563,7 +539,7 @@ Monitor.Start:
     ADD     A, A
     ADD     A, A
     LD      D, A
-    SYSCALL SC_ReadChar                ; Get next char from buffer
+    SYSCALL SC_SerialRead                ; Get next char from buffer
     SYSCALL SC_PrintChar
     CALL    .IHX.ParseNibble
     OR      D
@@ -685,17 +661,4 @@ Monitor.Start:
 .ErrorString:
     DB      "\r\n ?? Unknown Error", $00
 .UnknownCommandString:
-    DB      "\r\n ?? Unknown Command. 'H' for help.", $00
-.HelpText:
-    DB      "\r\n"
-    DB      "\r\n"
-    DB      "Interis 64 ROM Monitor Help\r\n"
-    DB      "--------------------------------------\r\n"
-    DB      "- M addr  | Start memory editor\r\n"
-    DB      "- X addr  | Start program at addr\r\n"
-    DB      "- R addr  | Read Intel Hex data from\r\n"
-    DB      "          | input with offset addr\r\n"
-    DB      "- Q       | Quit the monitor\r\n"
-    DB      "--------------------------------------"
-    DB      "\r\n"
-    DB      $00
+    DB      "\r\n ?? Unknown Command", $00
