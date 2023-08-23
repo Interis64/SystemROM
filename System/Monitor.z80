@@ -148,7 +148,7 @@ Monitor.Start:
 .ProcessMemoryEditorCommand:
     LD      A, (.CommandBufferLength) ; Check command length
     CP      6                               ; 6 bytes
-    JP      NZ, .MemoryEditorCommandError
+    JR      NZ, .MemoryEditorCommandError
     LD      HL, .CommandBuffer+2
     CALL    .ReadHexWord
     EX      DE, HL
@@ -156,7 +156,7 @@ Monitor.Start:
 
     LD      A, '\n'
     SYSCALL SC_PrintChar
-    JP      .ME_ControlLoop
+    JR      .ME_ControlLoop
 
 .MemoryEditorCommandError:
     LD      HL, .MemoryEditorCommandErrorString
@@ -170,7 +170,7 @@ Monitor.Start:
     CALL    .ME_PrintMemory
     CALL    .ME_AcceptInput
     CALL    .ME_ProcessInput
-    JP      .ME_ControlLoop
+    JR      .ME_ControlLoop
 
 ; Prints out 8 bytes of memory from the current address pointer as hex
 .ME_PrintMemory:
@@ -214,16 +214,16 @@ Monitor.Start:
     CP      '\r'                            ; CR completes input
     RET     Z                               ; So return out of the input loop
     CP      $08                             ; Ignore LF character
-    JP      Z, .ME_AcceptInputLoop
+    JR      Z, .ME_AcceptInputLoop
     CP      $08                             ; Handle Backspace
-    JP      Z, .ME_AcceptBackspace
+    JR      Z, .ME_AcceptBackspace
     CP      $1B
-    JP      Z, .ME_AcceptEscape      ; Esc key handler
+    JR      Z, .ME_AcceptEscape      ; Esc key handler
 
     LD      B, A                            ; Temporary store of input char
     LD      A, (.DataBufferLength)   ; Check if we're at the max input size
     CP      .DataBufferMax
-    JP      Z, .ME_AcceptInputLoop   ; If we're at max size, do nothing
+    JR      Z, .ME_AcceptInputLoop   ; If we're at max size, do nothing
     LD      A, SC_PrintChar
     LD      (SyscallTarget), A
     LD      A, B                            ; Restore input char
@@ -233,7 +233,7 @@ Monitor.Start:
     LD      A, (.DataBufferLength)   ; Increment our length counter
     INC     A
     LD      (.DataBufferLength), A        
-    JP      .ME_AcceptInputLoop      ; Wait for the next input
+    JR      .ME_AcceptInputLoop      ; Wait for the next input
 
 .ME_AcceptEscape:
     LD      A, (.DataBufferLength)   ; Load our length counter
@@ -263,47 +263,32 @@ Monitor.Start:
 .ME_ProcessInput:
     LD      A, (.DataBufferLength)   ; If the user entered nothing, then go to the next memory block
     CP      0
-    JP      Z, .ME_IncrementAddress
+    JR      Z, .ME_IncrementAddress
     LD      HL, .DataBuffer
+    LD      B, 8
     CALL    .ME_CheckDataByte
-    CALL    .ME_CheckDataByte
-    CALL    .ME_CheckDataByte
-    CALL    .ME_CheckDataByte
-    CALL    .ME_CheckDataByte
-    CALL    .ME_CheckDataByte
-    CALL    .ME_CheckDataByte
-    CALL    .ME_CheckDataByte
+    DJNZ    $-3
 
     LD      HL, .DataBuffer
     LD      DE, (.DataStartAddress)
+    LD      B, 8
     CALL    .ME_UpdateDataByte
-    CALL    .ME_UpdateDataByte
-    CALL    .ME_UpdateDataByte
-    CALL    .ME_UpdateDataByte
-    CALL    .ME_UpdateDataByte
-    CALL    .ME_UpdateDataByte
-    CALL    .ME_UpdateDataByte
-    CALL    .ME_UpdateDataByte
+    DJNZ    $-3
 
     RET
 
 .ME_IncrementAddress:
     LD      HL, (.DataStartAddress)
+    LD      B, 8
     INC     HL
-    INC     HL
-    INC     HL
-    INC     HL
-    INC     HL
-    INC     HL
-    INC     HL
-    INC     HL
+    DJNZ    $-1
     LD      (.DataStartAddress), HL
     RET
 
 .ME_CheckDataByte:
     LD      A, (HL)
     CP      ' '
-    JP      Z, .ME_CheckDataByteSkip
+    JR      Z, .ME_CheckDataByteSkip
     CALL    .TestHexDigitSpace
     JP      PO, .ME_DataError
     INC     HL
@@ -322,7 +307,7 @@ Monitor.Start:
 .ME_UpdateDataByte:
     LD      A, (HL)                         ; If it's a space, we can skip this byte
     CP      ' '
-    JP      Z, .ME_UpdateDataByteSkip
+    JR      Z, .ME_UpdateDataByteSkip
     CALL    .ReadHexByte
     LD      (DE), A                         ; Store the new value
     INC     DE
@@ -347,7 +332,7 @@ Monitor.Start:
 .ProcessExecuteCommand:
     LD      A, (.CommandBufferLength)        ; Check command length
     CP      6                               ; 6 bytes
-    JP      NZ, .ExecuteCommandError
+    JR      NZ, .ExecuteCommandError
     LD      HL, .CommandBuffer+2
     CALL    .ReadHexWord
     PUSH    DE                              ; Push onto the stack and we'll abuse RET to jump there
@@ -369,11 +354,11 @@ Monitor.Start:
 .ProcessDumpCommand:
     LD      A, (.CommandBufferLength)        ; Check command length
     CP      11                              ; 11 bytes
-    JP      NZ, .DumpCommandError
+    JR      NZ, .DumpCommandError
     LD      HL, .CommandBuffer+1
     LD      A, (HL)
     CP      $20                             ; Next char needs to be ASCII space
-    JP      Z, .DumpCommandError
+    JR      Z, .DumpCommandError
     INC     HL
     CALL    .ReadHexWord             ; This is the starting address
     PUSH    DE
@@ -392,7 +377,7 @@ Monitor.Start:
     DEC     BC
     LD      A, B
     OR      C
-    JP      NZ, .DumpLoop
+    JR      NZ, .DumpLoop
 
 
     RET
@@ -410,7 +395,7 @@ Monitor.Start:
 .ProcessQuitCommand:
     LD      A, (.CommandBufferLength) ; Check command length
     CP      1                               ; 1 byte
-    JP      NZ, .QuitCommandError
+    JR      NZ, .QuitCommandError
     CALL    Utils.PrintCRLF
     POP     HL                              ; Pop off our monitor return address
     RET                                     ; Return to the previous address (outside of Monitor)
@@ -432,7 +417,7 @@ Monitor.Start:
 .ProcessOutputCommand:
     LD      A, (.CommandBufferLength)        ; Check command length
     CP      7                                       ; 7 bytes
-    JP      NZ, .OutputCommandError
+    JR      NZ, .OutputCommandError
     LD      HL, .CommandBuffer+2
     CALL    .ReadHexByte
     LD      C, A
@@ -456,7 +441,7 @@ Monitor.Start:
 .ProcessInputCommand:
     LD      A, (.CommandBufferLength)        ; Check command length
     CP      4                                       ; 4 bytes
-    JP      NZ, .CommandError
+    JR      NZ, .InputCommandError
     LD      HL, .CommandBuffer+2
     CALL    .ReadHexByte
     LD      C, A
@@ -481,12 +466,12 @@ Monitor.Start:
 .ProcessReadCommand:
     LD      A, (.CommandBufferLength) ; Get the entered command length
     CP      6                               ; Check if it's 6 bytes
-    JP      NZ, .ReadCommandError    ; Not 6 bytes, so throw an error
+    JR      NZ, .ReadCommandError    ; Not 6 bytes, so throw an error
     LD      HL, .CommandBuffer + 2   ; Advance to the command argument
     CALL    .ReadHexWord             ; Stores the argument in DE
     LD      HL, .ReadCommandPrompt   ; Load the prompt string
     SYSCALL SC_PrintString                  ; Print it
-    JP      .IHX.ParseRecord         ; Go to the parsing routine
+    JR      .IHX.ParseRecord         ; Go to the parsing routine
 
 .ReadCommandError:
     LD      HL, .ReadCommandErrorString
@@ -502,35 +487,42 @@ Monitor.Start:
 ; ----------------------------
 .IHX.ParseRecord:
     SYSCALL SC_InputReady
-    JP      Z, .IHX.ParseRecord.CheckSerial
+    JR      Z, .IHX.ParseRecord.CheckSerial
     CALL    .IHX.CheckCancel
     RET     Z
 .IHX.ParseRecord.CheckSerial:
     SYSCALL SC_SerialReady
-    JP      Z, .IHX.ParseRecord
-    SYSCALL SC_SerialRead                ; Get next char from buffer
+    JR      Z, .IHX.ParseRecord
+    SYSCALL SC_SerialRead                   ; Get next char from buffer
     SYSCALL SC_PrintChar
     CP      ':'                             ; Check if it's a colon
-    JP      NZ, .IHX.ParseRecord     ; If not, get the next char
-    CALL    .IHX.ParseByte           ; Get the record length
+    JR      NZ, .IHX.ParseRecord            ; If not, get the next char
+    CALL    .IHX.ParseByte                  ; Get the record length
     LD      B, A                            ; Store into B
-    CALL    .IHX.ParseByte           ; Get the destination address high byte
+    CALL    .IHX.ParseByte                  ; Get the destination address high byte
     LD      H, A                            ; Store into H
-    CALL    .IHX.ParseByte           ; Get the destination address low byte
+    CALL    .IHX.ParseByte                  ; Get the destination address low byte
     LD      L, A                            ; Store into L
     ADD     HL, DE                          ; Adjust the memory address
-    CALL    .IHX.ParseByte           ; The the record type into A
+    CALL    .IHX.ParseByte                  ; The the record type into A
     CP      0                               ; Is record type 0 (Data)?
-    RET     NZ                              ; If not, assume EOF, unsupported, or invalid, so exit
+    JR      Z, .IHX.DataReadLoop            ; If so, read the data
+    CP      1                               ; Record type 1
+    JR      Z, .IHX.EndOfFile               ; Jump to EOF handling
+    JR      .IHX.ParseRecord                ; Anything other record type we ignore
 .IHX.DataReadLoop:
-    CALL    .IHX.ParseByte           ; Read the next byte
+    CALL    .IHX.ParseByte                  ; Read the next byte
     LD      (HL), A                         ; Store at the address in HL
     INC     HL                              ; Next address
-    DJNZ    .IHX.DataReadLoop        ; Go get the next byte
-    CALL    .IHX.ParseByte           ; Read checksum byte
+    DJNZ    .IHX.DataReadLoop               ; Go get the next byte
+    CALL    .IHX.ParseByte                  ; Read checksum byte
     LD      HL, .IHX.AcceptString
     SYSCALL SC_PrintString
-    JP      .IHX.ParseRecord         ; Done with this record, so get the next
+    JR      .IHX.ParseRecord                ; Done with this record, so get the next
+
+.IHX.EndOfFile:
+    CALL    .IHX.ParseByte                  ; Read the checksum byte
+    RET                                     ; And we're done
 
 .IHX.CheckCancel:
     SYSCALL SC_ReadChar
