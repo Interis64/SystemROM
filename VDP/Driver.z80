@@ -155,9 +155,11 @@ WriteVRAMBlock:
 
 ; Reads the VDP status register into A
 ReadStatus:
+    PUSH    BC
     LD      A, (ControlPort)
     LD      C, A
     IN      A, (C)
+    POP     BC
     RET
 
 ; Reads A from the VRAM location DE
