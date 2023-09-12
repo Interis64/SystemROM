@@ -148,7 +148,19 @@ WriteVRAMBlock:
 	OUT     (C), A
 	LD      A, (DataPort)
     LD      C, A
-	OTIR
+.WriteVRAMBlockLoop:
+    LD      A, (HL)
+    OUT     (C), A
+    INC     HL
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    NOP
+    DJNZ    .WriteVRAMBlockLoop
     POP     BC
     POP     AF
     RET
