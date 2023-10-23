@@ -15,28 +15,102 @@
 ; 135 TPI, 80 tracks, 18 sectors per track
 ; 300 RPM, 500 kbps
 ; ------------------------------------------------------------------------------
-    INCLUDE "System.lbl"
     
-    ORG StorageDriverBase                               ; Data Storage drivers get loaded to RAM at $E800
-
-DriverStart:
-SLOT:               DS  1 ; EQU SLOT5
-PORT_MSR:           DS  1 ; EQU SLOT + $10
-PORT_TC:            DS  1 ; EQU SLOT + $05
-PORT_LDCR:          DS  1 ; EQU SLOT + $09              
-PORT_CS:            DS  1 ; EQU SLOT + $11
-PORT_LDOR:          DS  1 ; EQU SLOT + $19
-PORT_DISK_CHG:      DS  1 ; EQU SLOT + $1C  ; Data bit 7 will contain the /DC signal
+    ORG             $F000                   ; Data Storage drivers get loaded to RAM at $F000
 
 BootCodeAddress:    EQU $0100               ; Address the boot sector should be loaded into
 
+.SLOT:               DS  1 ; EQU SLOT5
+.PORT_MSR:           DS  1 ; EQU SLOT + $10
+.PORT_TC:            DS  1 ; EQU SLOT + $05
+.PORT_LDCR:          DS  1 ; EQU SLOT + $09              
+.PORT_CS:            DS  1 ; EQU SLOT + $11
+.PORT_LDOR:          DS  1 ; EQU SLOT + $19
+.PORT_DISK_CHG:      DS  1 ; EQU SLOT + $1C  ; Data bit 7 will contain the /DC signal
+
+
 ; RAM Locations
-DataBuffer:         DS  2                   ; Starting address for read/write sector data (pointer to 512 byte block)
+DataBufferAddr:     DS  2                   ; Starting address for read/write sector data (pointer to 512 byte block)
 DriveNumber:        DS  1                   ; should be $00 or $01
 TrackNumber:        DS  1
 HeadNumber:         DS  1                   ; should be $00 or $01
 SectorNumber:       DS  1
 StatusBytes:        DS  4                   ; Storage for result status bytes (4 bytes)
+
+; Reserve space for future use
+    DS  $0F
+
+Boot:
+      JP    .Boot
+ResetFDC:
+      JP    .ResetFDC
+Recalibrate:
+      JP    .Recalibrate
+Specify:
+      JP    .Specify
+SelectDrive:
+      JP    .SelectDrive
+DeselectDrives:
+      JP    .DeselectDrives
+Seek:
+      JP    .Seek
+ReadSector:
+      JP    .ReadSector
+ReadDataByte:
+      JP    .ReadDataByte
+ReadDataRegister:
+      JP    .ReadDataRegister
+WriteDataRegister:
+      JP    .WriteDataRegister
+Configure:
+    JP      .Configure
+
+; Reserve space for four more jump table entries (total of 16)
+    DS  3 * 4
+
+; This configures the FDC driver for the IO address in A
+.Configure:
+    LD      (.SLOT), A
+
+    LD      A, (.SLOT)
+    ADD     A, $05
+    LD      (.PORT_TC), A
+
+    LD      A, (.SLOT)
+    ADD     A, $09
+    LD      (.PORT_LDCR), A
+
+    LD      A, (.SLOT)
+    ADD     A, $10
+    LD      (.PORT_MSR), A
+
+    LD      A, (.SLOT)
+    ADD     A, $11
+    LD      (.PORT_CS), A
+
+    LD      A, (.SLOT)
+    ADD     A, $19
+    LD      (.PORT_LDOR), A
+
+    LD      A, (.SLOT)
+    ADD     A, $1C
+    LD      (.PORT_DISK_CHG), A
+
+    PUSH    HL
+
+    LD      HL, .InPortCS
+    LD      A, (.PORT_CS)
+    INC     HL
+    LD      (HL), A
+
+    LD      HL, .InPortMSR
+    LD      A, (.PORT_MSR)
+    INC     HL
+    LD      (HL), A
+
+    POP     HL
+
+    RET
 
 ; ------------------------------------------------------------------------------
 ; N, SC, GPL Values
@@ -57,8 +131,8 @@ StatusBytes:        DS  4                   ; Storage for result status bytes (4
 ; and wait for drives to be polled and
 ; ready
 ; -------------------------------------
-ResetFDC:
-    LD      A, (PORT_LDOR)
+.ResetFDC:
+    LD      A, (.PORT_LDOR)
     LD      C, A
     LD      A, 00000000b                    ; Soft-reset the FDC
     OUT     (C), A
@@ -66,37 +140,37 @@ ResetFDC:
     LD      A, 00001100b                    ; Puts the FDC into AT/EISA Mode
     OUT     (C), A
 
-    LD      A, (PORT_LDCR)
+    LD      A, (.PORT_LDCR)
     LD      C, A
     LD      A, $00                          ; Load the control register
     OUT     (C), A
 
 	LD	    DE, 144			                ; DELAY: 17.4µs * 144 = 2.5ms
-	CALL	Delay
+	CALL	.Delay
 
-ResetWait:
+.ResetWait:
     ; Wait for drives to be ready
     LD      A, 00001000b                    ; "Sense Interrupt" command
-    CALL    WriteDataRegister
-    CALL    ReadDataRegister
+    CALL    .WriteDataRegister
+    CALL    .ReadDataRegister
     AND     11000000b
     CP      11000000b
-    JP      NZ, ResetWaitDone                ; If we get something other than $CX, then we're done waiting for drives to be ready
-    CALL    ReadDataRegister
-    JP      ResetWait
-ResetWaitDone:
+    JP      NZ, .ResetWaitDone                ; If we get something other than $CX, then we're done waiting for drives to be ready
+    CALL    .ReadDataRegister
+    JP      .ResetWait
+.ResetWaitDone:
     RET
 
 ; Busy-wait for (DE * 17.4)µs
-Delay:
+.Delay:
     LD      A, 7                            ;  7 T
-DelayLoop:
+.DelayLoop:
     DEC     A                               ;  4 T
-    JP      NZ, DelayLoop                   ; 10 T
+    JP      NZ, .DelayLoop                   ; 10 T
     DEC     DE                              ;  6 T
     LD      A, D                            ;  4 T
     OR      E                               ;  4 T
-    JP      NZ, Delay                       ; 10 T
+    JP      NZ, .Delay                       ; 10 T
     RET
 
 ; -------------------------------------
@@ -105,14 +179,14 @@ DelayLoop:
 ; RQM bit is 1 (ready), then read
 ; from the data register
 ; -------------------------------------
-ReadDataRegister:
-    LD      A, (PORT_MSR)
+.ReadDataRegister:
+    LD      A, (.PORT_MSR)
     LD      C, A
     IN      A, (C)                   ; Read main status register
     AND     11000000b
     CP      11000000b
-    JP      NZ, ReadDataRegister
-    LD      A, (PORT_CS)
+    JP      NZ, .ReadDataRegister
+    LD      A, (.PORT_CS)
     LD      C, A
     IN      A, (C)
     RET
@@ -123,16 +197,16 @@ ReadDataRegister:
 ; RQM bit is 1 (ready), then write
 ; to the data register
 ; -------------------------------------
-WriteDataRegister:
+.WriteDataRegister:
     PUSH    AF
-WriteDataRegisterWaitLoop:
-    LD      A, (PORT_MSR)
+.WriteDataRegisterWaitLoop:
+    LD      A, (.PORT_MSR)
     LD      C, A
     IN      A, (C)                   ; Read main status register
     AND     11000000b
     CP      10000000b
-    JP      NZ, WriteDataRegisterWaitLoop
-    LD      A, (PORT_CS)
+    JP      NZ, .WriteDataRegisterWaitLoop
+    LD      A, (.PORT_CS)
     LD      C, A
     POP     AF
     OUT     (C), A
@@ -141,8 +215,8 @@ WriteDataRegisterWaitLoop:
 ; -------------------------------------
 ; Select Drive
 ; -------------------------------------
-SelectDrive:
-    LD      A, (PORT_LDOR)
+.SelectDrive:
+    LD      A, (.PORT_LDOR)
     LD      C, A
     LD      A, (DriveNumber)
     OR      00010100b
@@ -152,8 +226,8 @@ SelectDrive:
 ; -------------------------------------
 ; Deselect Drives
 ; -------------------------------------
-DeselectDrives:
-    LD      A, (PORT_LDOR)
+.DeselectDrives:
+    LD      A, (.PORT_LDOR)
     LD      C, A
     LD      A, 00001100b
     OUT     (C), A
@@ -167,13 +241,13 @@ DeselectDrives:
 ; SSSSUUUU - S = Step Time, U = Unload Time
 ; HHHHHHHD - H = Head Load Time, D = Non-DMA mode
 ; -------------------------------------
-Specify:
+.Specify:
     LD      A, 00000011b                    ; "Specify" Command
-    CALL    WriteDataRegister
+    CALL    .WriteDataRegister
     LD      A, $D0                          ; Step Time (0xD0) and Unload Time (0x01)
-    CALL    WriteDataRegister
+    CALL    .WriteDataRegister
     LD      A, $11                          ; Load Time (0x01) and non-DMA mode (0x01)
-    CALL    WriteDataRegister
+    CALL    .WriteDataRegister
 
     RET
 
@@ -184,20 +258,20 @@ Specify:
 ; 00000111 - Command instruction
 ; 000000DD - DD = Drive select
 ; -------------------------------------
-Recalibrate:
+.Recalibrate:
     LD      A, 00000111b                    ; "Recalibrate" command
-    CALL    WriteDataRegister
+    CALL    .WriteDataRegister
     LD      A, 00000000b                    ; Drive 0
-    CALL    WriteDataRegister
-RecalibrateWait:
+    CALL    .WriteDataRegister
+.RecalibrateWait:
     ; Wait for the "recalibrate" to finish
     LD      A, 00001000b                    ; "Sense Interrupt" command
-    CALL    WriteDataRegister
-    CALL    ReadDataRegister
+    CALL    .WriteDataRegister
+    CALL    .ReadDataRegister
     AND     00100000b                       ; Mask for the termination bit
     CP      00100000b                       ; Normal Termination of Seek/Recal Command
-    JP      NZ, RecalibrateWait
-    CALL    ReadDataRegister
+    JP      NZ, .RecalibrateWait
+    CALL    .ReadDataRegister
 
     RET
 
@@ -209,22 +283,22 @@ RecalibrateWait:
 ; 00000HDD - H = Head, D = Drive
 ; CCCCCCCC - C = New Cylinder Number (NCN)
 ; -------------------------------------
-Seek:
+.Seek:
     LD      A, 00001111b                    ; "Seek" command
-    CALL    WriteDataRegister
+    CALL    .WriteDataRegister
     LD      A, 00000000b                    ; Drive 0, Head 0
-    CALL    WriteDataRegister
+    CALL    .WriteDataRegister
     LD      A, (TrackNumber)
-    CALL    WriteDataRegister
-SeekWait:
+    CALL    .WriteDataRegister
+.SeekWait:
     ; Wait for the "seek" to finish
     LD      A, 00001000b                    ; "Sense Interrupt" command
-    CALL    WriteDataRegister
-    CALL    ReadDataRegister
+    CALL    .WriteDataRegister
+    CALL    .ReadDataRegister
     AND     00100000b                       ; Mask for the termination bit
     CP      00100000b                       ; Normal Termination of Seek/Recal Command
-    JP      NZ, SeekWait
-    CALL    ReadDataRegister
+    JP      NZ, .SeekWait
+    CALL    .ReadDataRegister
 
     RET
 
@@ -243,7 +317,7 @@ SeekWait:
 ; 00011011 (GPL Gap Length = $1B (see above))
 ; 11111111 (DTL, Data Length, $FF if N is set above)
 ; -------------------------------------
-ReadSector:
+.ReadSector:
     DI                                      ; Disable interrupts so we keep timing during this
 
     PUSH    HL
@@ -251,7 +325,7 @@ ReadSector:
 
     ; Command
     LD      A, 01000110b                    ; "Read Data" command
-    CALL    WriteDataRegister
+    CALL    .WriteDataRegister
 
     ; Head and Drive ID
     LD      A, (HeadNumber)
@@ -259,35 +333,35 @@ ReadSector:
     SLA     A
     LD      HL, DriveNumber
     OR      (HL)
-    CALL    WriteDataRegister
+    CALL    .WriteDataRegister
     
     ; Cylinder Number
     LD      A, (TrackNumber)
-    CALL    WriteDataRegister
+    CALL    .WriteDataRegister
     
     ; Head Address
     LD      A, (HeadNumber)
-    CALL    WriteDataRegister
+    CALL    .WriteDataRegister
     
     ; Sector Number
     LD      A, (SectorNumber)
-    CALL    WriteDataRegister
+    CALL    .WriteDataRegister
     
     ; Bytes per sector
     LD      A, 00000010b
-    CALL    WriteDataRegister
+    CALL    .WriteDataRegister
 
     ; End of Track
     LD      A, (SectorNumber)
-    CALL    WriteDataRegister
+    CALL    .WriteDataRegister
 
     ; Gap Length
     LD      A, $1B
-    CALL    WriteDataRegister
+    CALL    .WriteDataRegister
 
     ; Data Length (unused)
     LD      A, $FF
-    CALL    WriteDataRegister
+    CALL    .WriteDataRegister
 
 ; ****************************************
 ; TODO: ADD CODE TO HANDLE NO SECTOR FOUND
@@ -296,57 +370,65 @@ ReadSector:
 
     ; Execution Phase, transfer data into buffer
     ; This code is extremely time-sensitive, tweak with caution
-    LD      HL, (DataBuffer)                ; Get the pointer to the data buffer
+    LD      HL, (DataBufferAddr)            ; Get the pointer to the data buffer
     LD      DE, $0000                       ; Timeout value
-ReadSectorDataLoop:
-    ; LD      A, (PORT_MSR)
-    ; LD      C, A
-    IN      A, ($F0)
+.ReadSectorDataLoop:
+
+; SELF-MODIFYING CODE!
+; Loading the MSR IO address from memory takes too long in this loop
+; so we have to write it here directly, which happens in the Configure
+; routine
+.InPortMSR:
+    IN      A, ($00)                        ; This I/O Address is replaced in the Configure routine
     CP      $F0
-    JP      Z, ReadDataByte
+    JP      Z, .ReadDataByte
     CP      $D0
-    JP      Z, ReadSectorDataComplete       ; IF the execution bit is reset, then jump to reading results
+    JP      Z, .ReadSectorDataComplete      ; IF the execution bit is reset, then jump to reading results
     DEC     DE                              ; Nothing happening? Decrement our timeout counter and try again
     LD      A, D
     OR      E                               ; Has our timeout counter timed out?
-    JP      Z, ReadSectorTimeout            ; If so, bail to the timeout routine
-    JP      ReadSectorDataLoop
-ReadDataByte:
-    ; LD      A, (PORT_CS)
-    ; LD      C, A
-    IN      A, ($F1)                        ; TODO: fix this... we don't have enough cycles to load it from memory every time
+    JP      Z, .ReadSectorTimeout           ; If so, bail to the timeout routine
+    JP      .ReadSectorDataLoop
+.ReadDataByte:
+
+; SELF-MODIFYING CODE!
+; Loading the CS IO address from memory takes too long in this loop
+; so we have to write it here directly, which happens in the Configure
+; routine
+.InPortCS:
+    IN      A, ($00)                        ; This I/O Address is replaced in the Configure routine
     LD      (HL), A
     INC     HL
-    JR      ReadSectorDataLoop
+    JR      .ReadSectorDataLoop
 
-ReadSectorTimeout:
+.ReadSectorTimeout:
     POP     DE
     POP     HL
     EI
     RET
 
-ReadSectorDataComplete:   
+.ReadSectorDataComplete:   
     ; Read Results Information
     LD      HL, StatusBytes
-    CALL    ReadDataRegister ; Status 0
+    CALL    .ReadDataRegister ; Status 0
     LD      (HL), A
     INC     HL
-    CALL    ReadDataRegister ; Status 1
+    CALL    .ReadDataRegister ; Status 1
     LD      (HL), A
     INC     HL
-    CALL    ReadDataRegister ; Status 2
+    CALL    .ReadDataRegister ; Status 2
     LD      (HL), A
     INC     HL
-    CALL    ReadDataRegister ; Cyl
+    CALL    .ReadDataRegister ; Cyl
     LD      (HL), A
     INC     HL
-    CALL    ReadDataRegister ; Head
+    CALL    .ReadDataRegister ; Head
     LD      (HL), A
     INC     HL
-    CALL    ReadDataRegister ; Record (sector)
+    CALL    .ReadDataRegister ; Record (sector)
     LD      (HL), A
     INC     HL
-    CALL    ReadDataRegister ; Number of bytes
+    CALL    .ReadDataRegister ; Number of bytes
     LD      (HL), A
 
     POP     DE
@@ -360,18 +442,18 @@ ReadSectorDataComplete:
 ; Load the first sector from the first disk drive into RAM starting at BootCodeAddress
 ; Then transfer execution to that code if it exists
 ; -------------------------------------
-Boot:
+.Boot:
     ; Clear the read buffer
     LD      B, 0
     LD      HL, BootCodeAddress
-ClearLoop:
+.ClearLoop:
     LD      (HL), $00
     INC     HL
-    DJNZ    ClearLoop
-ClearLoop2:
+    DJNZ    .ClearLoop
+.ClearLoop2:
     LD      (HL), $00
     INC     HL
-    DJNZ    ClearLoop2
+    DJNZ    .ClearLoop2
 
     XOR     A
     LD      (DriveNumber), A
@@ -382,14 +464,14 @@ ClearLoop2:
 
     ; Point the data buffer to our bootstrap location
     LD      HL, BootCodeAddress
-    LD      (DataBuffer), HL
-    CALL    ResetFDC
-    CALL    SelectDrive
-    CALL    Specify
-    CALL    Recalibrate
-    CALL    Seek
-    CALL    ReadSector
-    CALL    DeselectDrives
+    LD      (DataBufferAddr), HL
+    CALL    .ResetFDC
+    CALL    .SelectDrive
+    CALL    .Specify
+    CALL    .Recalibrate
+    CALL    .Seek
+    CALL    .ReadSector
+    CALL    .DeselectDrives
 
     ; ************************************************************
     ; Verify the "magic word" that says this is an Interis64 disk

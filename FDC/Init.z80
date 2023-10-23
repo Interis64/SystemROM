@@ -33,7 +33,7 @@ FDC.Initialize:
     LD      HL, FDCDriverStart                      ; Set the driver source address
     LDIR
 
-    CALL    .SetupIOAddr
+    CALL    FDCDriver.Configure
     CALL    FDCDriver.ResetFDC
     XOR     A
     LD      (FDCDriver.DriveNumber), A
@@ -53,29 +53,5 @@ FDC.Initialize:
 .LookForCard:
     LD      A, $01
     LD      (.InitInstalled), A
-    RET
-
-.SetupIOAddr:
-    LD      A, SLOT7
-    LD      (FDCDriver.SLOT), A
-
-    LD      A, SLOT7 + $10
-    LD      (FDCDriver.PORT_MSR), A
-
-    LD      A, SLOT7 + $05
-    LD      (FDCDriver.PORT_TC), A
-
-    LD      A, SLOT7 + $09
-    LD      (FDCDriver.PORT_LDCR), A
-
-    LD      A, SLOT7 + $11
-    LD      (FDCDriver.PORT_CS), A
-
-    LD      A, SLOT7 + $19
-    LD      (FDCDriver.PORT_LDOR), A
-
-    LD      A, SLOT7 + $1C
-    LD      (FDCDriver.PORT_DISK_CHG), A
-
     RET
 
