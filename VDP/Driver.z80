@@ -10,22 +10,54 @@
 ; Licensed under the GNU GPL 3.0. See the LICENSE file for details.
 ; ------------------------------------------------------------------------------
 
-    INCLUDE "System.lbl"
+    ORG $F400                               ; Video drivers get loaded to RAM at $F400
 
-    ORG VideoDriverBase                     ; Video drivers get loaded to RAM at $F400
+.TextScreenEnd:      EQU $17C0              ; VRAM Address one past the last char of the screen
+.CursorBlinkTime:    EQU 30                 ; Cursor blink time (number of frames)
 
-DriverStart:
-TextScreenEnd:      EQU $17C0               ; VRAM Address one past the last char of the screen
-CursorBlinkTime:    EQU 30                  ; Cursor blink time (number of frames)
+ControlPort:         DS 1                   ; The IO address for the VDP's control port
+DataPort:            DS 1                   ; The IO address for the VDP's data port
+CursorChar:          DS 1                   ; The font character to display as the text mode cursor
+CursorBlinkEnabled:  DS 1                   ; Non-zero if cursor blinking is enabled
+.CursorPosition:     DS 2                   ; The VRAM address of the text cursor
+.LinePosition:       DS 1                   ; The cursor position relative to the start of the line
+.CursorCharBuffer:   DS 1                   ; Space to store the character thet's "under" the cursor (for blinking)
+.CursorBlinkTimer:   DS 1                   ; Counter for making the cursor blink
+.CursorVisible:      DS 1                   ; Non-zero if the cursor is currently visible
+.LineCopyBuffer:     DS 240                 ; Space to copy six lines worth of text (for scrolling)
 
+; Reserve some space for future use
+    DS 6
+
+IRQHandler:
+    JP      .IRQHandler
+PrintChar:
+    JP      .PrintChar
 ClearVRAM:
+    JP      .ClearVRAM
+WriteVRAM:
+    JP      .WriteVRAM
+WriteVRAMBlock:
+    JP      .WriteVRAMBlock
+ReadVRAM:
+    JP      .ReadVRAM
+ReadVRAMBlock:
+    JP      .ReadVRAMBlock
+WriteRegister:
+    JP      .WriteRegister
+ReadStatus:
+    JP      .ReadStatus
+; Reserved space for future use (16 total slots: four exist, 12 reserved)
+    DS      3 * 7
+
+.ClearVRAM:
     PUSH    AF
     PUSH    BC
     PUSH    HL
     LD      HL, $1400                       ; Set the cursor to the beginning of the
-    LD      (CursorPosition), HL            ; Pattern Name Table
+    LD      (.CursorPosition), HL            ; Pattern Name Table
     LD      A, $00                          ; Clear the LinePosition indicator
-    LD      (LinePosition), A
+    LD      (.LinePosition), A
 
     LD      A, (ControlPort)
     LD      C, A
@@ -37,19 +69,19 @@ ClearVRAM:
     LD      C, A
     XOR     A
     LD      B, $04
-ClearVRAMLoop:
+.ClearVRAMLoop:
     PUSH    BC
     LD      B, $00
-ClearVRAMLoopInner:
+.ClearVRAMLoopInner:
     OUT     (C), A
-    DJNZ    ClearVRAMLoopInner
+    DJNZ    .ClearVRAMLoopInner
     POP     BC
-    DJNZ    ClearVRAMLoop
+    DJNZ    .ClearVRAMLoop
 
     LD      HL, $1400                       ; Set the cursor to the beginning of the
-    LD      (CursorPosition), HL            ; Pattern Name Table
+    LD      (.CursorPosition), HL            ; Pattern Name Table
     XOR     A                               ; Clear the LinePosition indicator
-    LD      (LinePosition), A
+    LD      (.LinePosition), A
     LD      A, (ControlPort)
     LD      C, A
     XOR     A                               ; Set low byte of VRAM address 0x00
@@ -62,61 +94,61 @@ ClearVRAMLoopInner:
     POP     AF
     RET
 
-IRQHandler:
+.IRQHandler:
     PUSH    AF
-    CALL    ReadStatus                      ; Read the status register (clears interrupt flag)
+    CALL    .ReadStatus                     ; Read the status register (clears interrupt flag)
     LD      A, (CursorBlinkEnabled)         ; Check if blinking is enabled
     CP      0
-    JP      Z, IRQExit                      ; If blinking is disabled, do nothing
-    LD      A, (CursorBlinkTimer)           ; Load the cursor blink timer
+    JP      Z, .IRQExit                     ; If blinking is disabled, do nothing
+    LD      A, (.CursorBlinkTimer)           ; Load the cursor blink timer
     DEC     A                               ; Decrement
-    JP      NZ, IRQExit                     ; Still have time left? Do nothing
-    ; CALL    ToggleCursor                    ; Timer expired, toggle cursor visibility
-IRQExit:
+    JP      NZ, .IRQExit                    ; Still have time left? Do nothing
+    ; CALL    ToggleCursor                  ; Timer expired, toggle cursor visibility
+.IRQExit:
     POP     AF
     EI
 	RETI
 
-ToggleCursor:
-    LD      A, (CursorVisible)
+.ToggleCursor:
+    LD      A, (.CursorVisible)
     CP      0
-    JP      Z, SetCursorVisible
-    JP      SetCursorHidden
+    JP      Z, .SetCursorVisible
+    JP      .SetCursorHidden
 
 ; Draw the cursor character at the current cursor position
-SetCursorVisible:
+.SetCursorVisible:
     PUSH    AF
     PUSH    DE
-    LD      DE, (CursorPosition)
-    CALL    ReadVRAM
-    LD      (CursorCharBuffer), A
+    LD      DE, (.CursorPosition)
+    CALL    .ReadVRAM
+    LD      (.CursorCharBuffer), A
     LD      A, (CursorChar)
-    CALL    WriteVRAM
+    CALL    .WriteVRAM
     LD      A, 1
-    LD      (CursorVisible), A
-    LD      A, CursorBlinkTime
-    LD      (CursorBlinkTimer), A           ; Reset the blink timer
+    LD      (.CursorVisible), A
+    LD      A, .CursorBlinkTime
+    LD      (.CursorBlinkTimer), A           ; Reset the blink timer
     POP     DE
     POP     AF
     RET
 
 ; Draw the screen character at the current cursor position
-SetCursorHidden:
+.SetCursorHidden:
     PUSH    AF
     PUSH    DE
-    LD      DE, (CursorPosition)            ; Gets the current cursor position
-    LD      A, (CursorCharBuffer)           ; Loads the buffered character from memory
-    CALL    WriteVRAM                       ; Replace the cursor char on screen
+    LD      DE, (.CursorPosition)            ; Gets the current cursor position
+    LD      A, (.CursorCharBuffer)           ; Loads the buffered character from memory
+    CALL    .WriteVRAM                       ; Replace the cursor char on screen
     LD      A, 0                    
-    LD      (CursorVisible), A              ; Un-set the cursor-visible flag
-    LD      A, CursorBlinkTime
-    LD      (CursorBlinkTimer), A           ; Reset the blink timer
+    LD      (.CursorVisible), A              ; Un-set the cursor-visible flag
+    LD      A, .CursorBlinkTime
+    LD      (.CursorBlinkTimer), A           ; Reset the blink timer
     POP     DE
     POP     AF
     RET
 
 ; Writes A to the VRAM location DE
-WriteVRAM:
+.WriteVRAM:
     PUSH    BC
     PUSH    AF
     LD      A, (ControlPort)
@@ -135,7 +167,7 @@ WriteVRAM:
     RET
 
 ; Writes data from memory addresses HL to HL + B starting at VRAM address DE
-WriteVRAMBlock:
+.WriteVRAMBlock:
     PUSH    AF
     PUSH    BC
     LD      A, (ControlPort)
@@ -166,7 +198,7 @@ WriteVRAMBlock:
     RET
 
 ; Reads the VDP status register into A
-ReadStatus:
+.ReadStatus:
     PUSH    BC
     LD      A, (ControlPort)
     LD      C, A
@@ -175,7 +207,7 @@ ReadStatus:
     RET
 
 ; Reads A from the VRAM location DE
-ReadVRAM:
+.ReadVRAM:
     PUSH    BC
     LD      A, (ControlPort)
     LD      C, A
@@ -191,7 +223,7 @@ ReadVRAM:
     RET
 
 ; Reads data into memory addresses HL to HL + B starting at VRAM address DE
-ReadVRAMBlock:
+.ReadVRAMBlock:
     PUSH    AF
     PUSH    BC
     LD      A, (ControlPort)
@@ -209,7 +241,7 @@ ReadVRAMBlock:
     RET
 
 ; Writes the data in A to VDP register number B
-WriteRegister:
+.WriteRegister:
     PUSH    AF
     LD      A, (ControlPort)
     LD      C, A
@@ -222,122 +254,122 @@ WriteRegister:
     RET
 
 ; Prints the byte in A as an ASCII character at the cursor position and advances the cursor
-PrintChar:
+.PrintChar:
     CP      $0C                        ; Handle Form Feed (clear screen)
-    JP      Z, ClearVRAM
+    JP      Z, .ClearVRAM
     CP      '\r'                        ; Handle carriage return
-    JP      Z, PrintCR
+    JP      Z, .PrintCR
     CP      '\n'                        ; Handle line feed
-    JP      Z, PrintLF
+    JP      Z, .PrintLF
     CP      $08
-    JP      Z, Backspace
+    JP      Z, .Backspace
     PUSH    BC
     PUSH    DE
-    CALL    SetCursorHidden                 ; Hide the cursor so we don't lose on-screen characters
-    LD      DE, (CursorPosition)            ; Load the cursor's current position
-    CALL    WriteVRAM                       ; Write our character
+    CALL    .SetCursorHidden                 ; Hide the cursor so we don't lose on-screen characters
+    LD      DE, (.CursorPosition)            ; Load the cursor's current position
+    CALL    .WriteVRAM                       ; Write our character
     INC     DE                              ; Increment the cursor position
-    LD      (CursorPosition), DE            ; Save cursor position
-    CALL    IncrementLinePosition           ; Increment the position on the current line
-    CALL    SetCursorVisible                ; Re-enable the cursor
+    LD      (.CursorPosition), DE            ; Save cursor position
+    CALL    .IncrementLinePosition           ; Increment the position on the current line
+    CALL    .SetCursorVisible                ; Re-enable the cursor
     POP     DE
     POP     BC
     RET
 
 ; Handle a carriage return (return the cursor to the beginning of the line)
-PrintCR:
+.PrintCR:
     PUSH    AF
     PUSH    DE
-    CALL    SetCursorHidden
-    LD      DE, (CursorPosition)
-    LD      A, (LinePosition)
-PrintCRLoop:
+    CALL    .SetCursorHidden
+    LD      DE, (.CursorPosition)
+    LD      A, (.LinePosition)
+.PrintCRLoop:
     CP      0
-    JP      Z, PrintCRDone
+    JP      Z, .PrintCRDone
     DEC     DE
     DEC     A
-    JP      PrintCRLoop
-PrintCRDone:
-    LD      (CursorPosition), DE
-    LD      (LinePosition), A
-    CALL    SetCursorVisible
+    JP      .PrintCRLoop
+.PrintCRDone:
+    LD      (.CursorPosition), DE
+    LD      (.LinePosition), A
+    CALL    .SetCursorVisible
     POP     DE
     POP     AF
     RET
 
 ; Handle a line-feed (advance the cursor by one line, check screen scroll)
-PrintLF:
+.PrintLF:
     PUSH    BC
     PUSH    DE
-    CALL    SetCursorHidden
-    LD      DE, (CursorPosition)
+    CALL    .SetCursorHidden
+    LD      DE, (.CursorPosition)
     LD      B, 40
-PrintLFLoop:
+.PrintLFLoop:
     INC     DE
-    DJNZ    PrintLFLoop
-    LD      (CursorPosition), DE
-    CALL    CheckScreenScroll
-    CALL    SetCursorVisible
+    DJNZ    .PrintLFLoop
+    LD      (.CursorPosition), DE
+    CALL    .CheckScreenScroll
+    CALL    .SetCursorVisible
     POP     DE
     POP     BC
     RET
 
 ; Handles the backspace character
-Backspace:
+.Backspace:
     PUSH    AF
     PUSH    DE
     PUSH    HL
 
-    CALL    SetCursorHidden                 ; Hide the cursor
-    LD      DE, (CursorPosition)            ; Get the current cursor position
+    CALL    .SetCursorHidden                 ; Hide the cursor
+    LD      DE, (.CursorPosition)            ; Get the current cursor position
     DEC     DE                              ; Go back a char
     LD      A, " "
-    CALL    WriteVRAM
-    LD      (CursorPosition), DE
-    CALL    DecrementLinePosition
-    CALL    SetCursorVisible
+    CALL    .WriteVRAM
+    LD      (.CursorPosition), DE
+    CALL    .DecrementLinePosition
+    CALL    .SetCursorVisible
     POP     HL
     POP     DE
     POP     AF
     RET
 
-IncrementLinePosition:
+.IncrementLinePosition:
     PUSH    AF
-    LD      A, (LinePosition)
+    LD      A, (.LinePosition)
     INC     A
     CP      40
-    JR      NC, ResetLinePosition
-    LD      (LinePosition), A
+    JR      NC, .ResetLinePosition
+    LD      (.LinePosition), A
     POP     AF
     RET
-ResetLinePosition:
+.ResetLinePosition:
     XOR     A
-    LD      (LinePosition), A
-    CALL    CheckScreenScroll
+    LD      (.LinePosition), A
+    CALL    .CheckScreenScroll
     POP     AF
     RET
 
-DecrementLinePosition:
+.DecrementLinePosition:
     PUSH    AF
-    LD      A, (LinePosition)
+    LD      A, (.LinePosition)
     CP      0
-    JR      Z, DecrementLinePositionReset
+    JR      Z, .DecrementLinePositionReset
     DEC     A
-    LD      (LinePosition), A
+    LD      (.LinePosition), A
     POP     AF
     RET
-DecrementLinePositionReset:
+.DecrementLinePositionReset:
     LD      A, 40
-    LD      (LinePosition), A
+    LD      (.LinePosition), A
     POP     AF
     RET
 
-CheckScreenScroll:
+.CheckScreenScroll:
     PUSH    DE
     PUSH    HL
     
-    LD      HL, (CursorPosition)
-    LD      DE, TextScreenEnd
+    LD      HL, (.CursorPosition)
+    LD      DE, .TextScreenEnd
     OR      A                               ; CP HL, DE
     SBC     HL, DE                          ; CP HL, DE
     ADD     HL, DE                          ; CP HL, DE
@@ -350,47 +382,47 @@ CheckScreenScroll:
     PUSH    DE
     PUSH    HL
 
-    LD      HL, LineCopyBuffer          
+    LD      HL, .LineCopyBuffer          
     LD      DE, $1428                       ; Start at the second line
     LD      B, 240
-    CALL    ReadVRAMBlock                   ; read 6 lines
-    LD      HL, LineCopyBuffer
+    CALL    .ReadVRAMBlock                   ; read 6 lines
+    LD      HL, .LineCopyBuffer
     LD      DE, $1400                       ; Go back to the first line
     LD      B, 240
-    CALL    WriteVRAMBlock                  ; write 6 lines
+    CALL    .WriteVRAMBlock                  ; write 6 lines
     
-    LD      HL, LineCopyBuffer          
+    LD      HL, .LineCopyBuffer          
     LD      DE, $1518                   
     LD      B, 240
-    CALL    ReadVRAMBlock
-    LD      HL, LineCopyBuffer
+    CALL    .ReadVRAMBlock
+    LD      HL, .LineCopyBuffer
     LD      DE, $14F0
     LD      B, 240
-    CALL    WriteVRAMBlock
+    CALL    .WriteVRAMBlock
     
-    LD      HL, LineCopyBuffer          
+    LD      HL, .LineCopyBuffer          
     LD      DE, $1608                   
     LD      B, 240
-    CALL    ReadVRAMBlock
-    LD      HL, LineCopyBuffer
+    CALL    .ReadVRAMBlock
+    LD      HL, .LineCopyBuffer
     LD      DE, $15E0
     LD      B, 240
-    CALL    WriteVRAMBlock
+    CALL    .WriteVRAMBlock
     
-    LD      HL, LineCopyBuffer          
+    LD      HL, .LineCopyBuffer          
     LD      DE, $16F8                   
     LD      B, 240
-    CALL    ReadVRAMBlock
-    LD      HL, LineCopyBuffer
+    CALL    .ReadVRAMBlock
+    LD      HL, .LineCopyBuffer
     LD      DE, $16D0
     LD      B, 240
-    CALL    WriteVRAMBlock
+    CALL    .WriteVRAMBlock
 
-    LD      HL, (CursorPosition)
+    LD      HL, (.CursorPosition)
     LD      B, 40
     DEC     HL
     DJNZ    $-1
-    LD      (CursorPosition), HL
+    LD      (.CursorPosition), HL
     
     POP     HL
     POP     DE
@@ -398,13 +430,3 @@ CheckScreenScroll:
     POP     AF
     RET
 
-ControlPort:        DS 1                    ; The IO address for the VDP's control port
-DataPort:           DS 1                    ; The IO address for the VDP's data port
-CursorPosition:     DS 2                    ; The VRAM address of the text cursor
-LinePosition:       DS 1                    ; The cursor position relative to the start of the line
-CursorChar:         DS 1                    ; The font character to display as the text mode cursor
-CursorBlinkEnabled: DS 1                    ; Non-zero if cursor blinking is enabled
-CursorCharBuffer:   DS 1                    ; Space to store the character thet's "under" the cursor (for blinking)
-CursorBlinkTimer:   DS 1                    ; Counter for making the cursor blink
-CursorVisible:      DS 1                    ; Non-zero if the cursor is currently visible
-LineCopyBuffer:     DS 240                  ; Space to copy six lines worth of text (for scrolling)

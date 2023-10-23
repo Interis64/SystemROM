@@ -10,92 +10,101 @@
 ; Licensed under the GNU GPL 3.0. See the LICENSE file for details.
 ; ------------------------------------------------------------------------------
 
-    INCLUDE "System.lbl"
-
-    ORG     AudioDriverBase
+    ORG         $EC00                       ; Audio device drivers get loaded to RAM at $F000
 
 Installed:      DS  1
 AddressPort:    DS  1
 DataPort:       DS  1
 
 ; Register numbers
-R_TEST:         EQU $00                     ; Test Data / OPL2 Waveform Enable (bit5)
-R_TIMER1:       EQU $01                     ; Timer 1
-R_TIMER2:       EQU $02                     ; Timer 2
-R_TIMERC:       EQU $04                     ; Timer Control
-R_CSMKSP:       EQU $08                     ; CSM Speech Synth / Key Split Note
-R_PARAM1:       EQU $20                     ; AM / Vib / EG Type / Key Scale / Multiple 
-R_PARAM2:       EQU $40                     ; Key Scaling Level / Output Level
-R_PARAM3:       EQU $60                     ; Attack Rate / Decay Rate
-R_PARAM4:       EQU $80                     ; Sustain Level / Release Rate
-R_FREQ:         EQU $A0                     ; Frequency (low 8 bits)
-R_OOF:          EQU $B0                     ; Note ON/OFF / Octave / Frequency (high 2 bits)
-R_AMVIBR:       EQU $BD                     ; AM Depth / Vibrato Depth / Rhythm Control
-R_FEEDBK:       EQU $C0                     ; Feedback Strength 
-R_WAVE:         EQU $E0                     ; Waveform Select
+.R_TEST:         EQU $00                     ; Test Data / OPL2 Waveform Enable (bit5)
+.R_TIMER1:       EQU $01                     ; Timer 1
+.R_TIMER2:       EQU $02                     ; Timer 2
+.R_TIMERC:       EQU $04                     ; Timer Control
+.R_CSMKSP:       EQU $08                     ; CSM Speech Synth / Key Split Note
+.R_PARAM1:       EQU $20                     ; AM / Vib / EG Type / Key Scale / Multiple 
+.R_PARAM2:       EQU $40                     ; Key Scaling Level / Output Level
+.R_PARAM3:       EQU $60                     ; Attack Rate / Decay Rate
+.R_PARAM4:       EQU $80                     ; Sustain Level / Release Rate
+.R_FREQ:         EQU $A0                     ; Frequency (low 8 bits)
+.R_OOF:          EQU $B0                     ; Note ON/OFF / Octave / Frequency (high 2 bits)
+.R_AMVIBR:       EQU $BD                     ; AM Depth / Vibrato Depth / Rhythm Control
+.R_FEEDBK:       EQU $C0                     ; Feedback Strength 
+.R_WAVE:         EQU $E0                     ; Waveform Select
 
 IRQHandler:
+    JP      .IRQHandler
+Beep:
+    JP      .Beep
+WriteRegister:
+    JP      .WriteRegister
+ResetAll:
+    JP      .ResetAll
+; Reserved space for future use (16 total slots: four exist, 12 reserved)
+    DS      3 * 12
+
+.IRQHandler:
     EI
     RETI
     
 ; ------------------------------------------------------------------------------
 ; A quick sound test routine to see if things are actually working
 ; ------------------------------------------------------------------------------
-Beep:
+.Beep:
 ; Set the modulator's multiple to 1
     LD      HL, $2001
-    CALL    WriteRegister
+    CALL    .WriteRegister
 
 ; Set the modulator's level to about 40 dB
     LD      HL, $403F
-    CALL    WriteRegister
+    CALL    .WriteRegister
 
 ; Modulator attack:  quick;   decay:   long
     LD      HL, $60F4
-    CALL    WriteRegister
+    CALL    .WriteRegister
 
 ; Modulator sustain: medium;  release: medium
     LD      HL, $807F
-    CALL    WriteRegister
+    CALL    .WriteRegister
 ; Set voice frequency's LSB (it'll be a D#)
     LD      HL, $A098
-    CALL    WriteRegister
+    CALL    .WriteRegister
 
 ; Set the carrier's multiple to 1
     LD      HL, $2301
-    CALL    WriteRegister
+    CALL    .WriteRegister
 
 ; Set the carrier to maximum volume (about 47 dB)
     LD      HL, $4300
-    CALL    WriteRegister
+    CALL    .WriteRegister
 
 ; Carrier attack:  quick;   decay:   long
     LD      HL, $63F0
-    CALL    WriteRegister
+    CALL    .WriteRegister
 
 ; Carrier sustain: medium;  release: medium
     LD      HL, $837F
-    CALL    WriteRegister
+    CALL    .WriteRegister
 
 ; Turn the voice on; set the octave and freq MSB
     LD      HL, $B036
-    CALL    WriteRegister
+    CALL    .WriteRegister
 
 ; Wait.
     LD      B, $00
-WaitLoop:
+.WaitLoop:
     PUSH    BC
     LD      B, $00
     DJNZ    $
     POP     BC
-    DJNZ    WaitLoop
+    DJNZ    .WaitLoop
     
 ; Turn the voice off
     LD      HL, $B011
-    JP    WriteRegister
+    JP      .WriteRegister
 
 ; Accept register address in H, value in L
-WriteRegister:
+.WriteRegister:
     PUSH    AF
     PUSH    BC
     LD      A, (AddressPort)
@@ -114,13 +123,13 @@ WriteRegister:
     POP     AF
     RET
 
-ResetAll:
+.ResetAll:
     LD      L, $00
     LD      H, $01
-ResetLoop:
-    CALL    WriteRegister
+.ResetLoop:
+    CALL    .WriteRegister
     INC     H
     LD      A, H
     CP      0
     RET     Z
-    JP      ResetLoop
+    JR      .ResetLoop
