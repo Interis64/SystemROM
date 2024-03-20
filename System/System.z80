@@ -3,7 +3,7 @@
 ; ------------------------------------------------------------------------------
 ; This just contains basic layout and includes for the system template that gets
 ; copied into RAM at system startup. If you're looking for the actual system
-; call code, that's in BaseSystem.z80
+; call code, that's in Boot.z80
 ; ------------------------------------------------------------------------------
 ; Interis 64 Z80 Computer
 ; https://github.com/Interis64
@@ -16,7 +16,7 @@
 
     ORG     SystemBase
 
-    INCLUDE "BaseSystem.z80"
+    INCLUDE "Boot.z80"
 
     SEEK    IRQ0Vector - SystemBase
     DW      NullInterruptHandler
