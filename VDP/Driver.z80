@@ -10,7 +10,7 @@
 ; Licensed under the GNU GPL 3.0. See the LICENSE file for details.
 ; ------------------------------------------------------------------------------
 
-    ORG $F400                               ; Video drivers get loaded to RAM at $F400
+    ORG $E800                               ; Video drivers get loaded to RAM at $E800
 
 .TextScreenEnd:      EQU $17C0              ; VRAM Address one past the last char of the screen
 .CursorBlinkTime:    EQU 30                 ; Cursor blink time (number of frames)
@@ -255,14 +255,17 @@ ReadStatus:
 
 ; Prints the byte in A as an ASCII character at the cursor position and advances the cursor
 .PrintChar:
-    CP      $0C                        ; Handle Form Feed (clear screen)
-    JP      Z, .ClearVRAM
+    PUSH    AF
+    CP      $0C                         ; Handle Form Feed (clear screen)
+    JP      Z, .PrintFF
     CP      '\r'                        ; Handle carriage return
     JP      Z, .PrintCR
     CP      '\n'                        ; Handle line feed
     JP      Z, .PrintLF
+    CP      $07
+    JP      Z, .PrintBEL
     CP      $08
-    JP      Z, .Backspace
+    JP      Z, .PrintBS
     PUSH    BC
     PUSH    DE
     CALL    .SetCursorHidden                 ; Hide the cursor so we don't lose on-screen characters
@@ -274,6 +277,7 @@ ReadStatus:
     CALL    .SetCursorVisible                ; Re-enable the cursor
     POP     DE
     POP     BC
+    POP     AF
     RET
 
 ; Handle a carriage return (return the cursor to the beginning of the line)
@@ -295,6 +299,7 @@ ReadStatus:
     CALL    .SetCursorVisible
     POP     DE
     POP     AF
+    POP     AF
     RET
 
 ; Handle a line-feed (advance the cursor by one line, check screen scroll)
@@ -312,24 +317,39 @@ ReadStatus:
     CALL    .SetCursorVisible
     POP     DE
     POP     BC
+    POP     AF
+    RET
+
+; Handles the BEL character
+.PrintBEL:
+    PUSH    AF
+    LD      A, $10
+    LD      ($FFFF), A
+    POP     AF
+    RST     $10
+    POP     AF
     RET
 
 ; Handles the backspace character
-.Backspace:
-    PUSH    AF
+.PrintBS:
     PUSH    DE
     PUSH    HL
 
     CALL    .SetCursorHidden                 ; Hide the cursor
     LD      DE, (.CursorPosition)            ; Get the current cursor position
     DEC     DE                              ; Go back a char
-    LD      A, " "
+    LD      A, $00
     CALL    .WriteVRAM
     LD      (.CursorPosition), DE
     CALL    .DecrementLinePosition
     CALL    .SetCursorVisible
     POP     HL
     POP     DE
+    POP     AF
+    RET
+
+.PrintFF:
+    CALL    .ClearVRAM
     POP     AF
     RET
 
