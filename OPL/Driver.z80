@@ -10,7 +10,7 @@
 ; Licensed under the GNU GPL 3.0. See the LICENSE file for details.
 ; ------------------------------------------------------------------------------
 
-    ORG         $EC00                       ; Audio device drivers get loaded to RAM at $F000
+    ORG         $EC00                       ; Audio device drivers get loaded to RAM at $EC00
 
 Installed:      DS  1
 AddressPort:    DS  1

@@ -128,8 +128,8 @@ OPL.Initialize: ; Initialize the OPL2
 .LookForCard:
     LD      A, $80                              ; Start looking at base address 0x80
 .LookForCardLoop:                            
-    PUSH    HL                                  ; Check if there's an existing Hardware ID for that slot
-    PUSH    AF
+    PUSH    AF                                  ; Check if there's an existing Hardware ID for that slot
+    PUSH    HL
     SRL     A                                   ; Shift the IO address to get a slot number
     SRL     A
     SRL     A

@@ -33,6 +33,7 @@ FDC.Initialize:
     LD      HL, FDCDriverStart                      ; Set the driver source address
     LDIR
 
+    LD      A, SLOT7
     CALL    FDCDriver.Configure
     CALL    FDCDriver.ResetFDC
     XOR     A

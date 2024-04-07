@@ -1,3 +1,4 @@
+.PHONY: all
 all: dist/InterisROM.bin
 
 dist/InterisROM.bin: main.z80 VDP/Init.z80 FDC/Init.z80 OPL/Init.z80 build/System.bin build/VDPDriver.bin build/OPLDriver.bin build/FDCDriver.bin
@@ -36,7 +37,12 @@ clean:
 .PHONY: burn
 burn:
 	@echo "Writing to EEPROM: dist/InterisROM.bin"
-	@minipro -p AT28c256 -w dist/InterisROM.bin
+	@minipro -u -p AT28c256 -w dist/InterisROM.bin
+
+.PHONY: emulate
+emulate:
+	@echo "Sending to EPROM emulator: dist/InterisROM.bin"
+	@~/Desktop/EPROM\ Emulator/update.sh dist/InterisROM.bin
 
 # This function is used to check that a file fits within the allocated size
 # Inputs:
