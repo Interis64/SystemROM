@@ -130,6 +130,7 @@ OPL.Initialize: ; Initialize the OPL2
 .LookForCardLoop:                            
     PUSH    AF                                  ; Check if there's an existing Hardware ID for that slot
     PUSH    HL
+    LD      HL , $0000
     SRL     A                                   ; Shift the IO address to get a slot number
     SRL     A
     SRL     A
